@@ -55,6 +55,7 @@ const Floating3DObjects: React.FC = () => {
     // Load GLTF model
     const loader = new GLTFLoader();
     const objects: THREE.Object3D[] = [];
+    let hoveredObject: THREE.Object3D | null = null;
 
     const loadModel = async () => {
       try {
@@ -83,26 +84,33 @@ const Floating3DObjects: React.FC = () => {
         const originalModel = gltf.scene;
         console.log('Original model:', originalModel);
         
-        // Create multiple instances of the ashtray
-        for (let i = 0; i < 8; i++) {
+        // Create 12 static ashtrays in a nice distribution
+        for (let i = 0; i < 12; i++) {
           const ashtray = originalModel.clone();
           
-          // Random positions
+          // Arrange in a more organized pattern
+          const angle = (i / 12) * Math.PI * 2;
+          const radius1 = 8 + Math.random() * 6;
+          const radius2 = 15 + Math.random() * 8;
+          const useInnerRing = i < 6;
+          const radius = useInnerRing ? radius1 : radius2;
+          
+          // Position ashtrays in two rings with some randomness
           ashtray.position.set(
-            (Math.random() - 0.5) * 30,
-            (Math.random() - 0.5) * 15,
-            (Math.random() - 0.5) * 15
+            Math.cos(angle + (Math.random() - 0.5) * 0.5) * radius,
+            (Math.random() - 0.5) * 8, // Some vertical variation
+            Math.sin(angle + (Math.random() - 0.5) * 0.5) * radius
           );
           
           // Varied scale
-          const scale = 0.5 + Math.random() * 0.8;
+          const scale = 0.4 + Math.random() * 0.6;
           ashtray.scale.setScalar(scale);
           
-          // Random initial rotation
+          // Random initial rotation (but they will stay static)
           ashtray.rotation.set(
+            (Math.random() - 0.5) * Math.PI * 0.5,
             Math.random() * Math.PI * 2,
-            Math.random() * Math.PI * 2,
-            Math.random() * Math.PI * 2
+            (Math.random() - 0.5) * Math.PI * 0.5
           );
 
           // Apply different materials for variety
@@ -141,13 +149,11 @@ const Floating3DObjects: React.FC = () => {
             }
           });
           
-          // Animation properties
-          (ashtray as any).initialY = ashtray.position.y;
-          (ashtray as any).floatSpeed = Math.random() * 0.02 + 0.01;
-          (ashtray as any).rotationSpeed = {
-            x: (Math.random() - 0.5) * 0.015,
-            y: (Math.random() - 0.5) * 0.02,
-            z: (Math.random() - 0.5) * 0.015,
+          // Store original rotation for smooth transitions
+          (ashtray as any).originalRotation = {
+            x: ashtray.rotation.x,
+            y: ashtray.rotation.y,
+            z: ashtray.rotation.z
           };
           
           scene.add(ashtray);
@@ -160,7 +166,6 @@ const Floating3DObjects: React.FC = () => {
       } catch (err) {
         console.error('Failed to load GLTF model:', err);
         setError(`Model loading failed: ${err}`);
-        // DO NOT create fallback objects - only show ashtrays
       }
     };
 
@@ -170,18 +175,23 @@ const Floating3DObjects: React.FC = () => {
     // Mouse interaction
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
-    let hoveredObject: THREE.Object3D | null = null;
 
     const onMouseMove = (event: MouseEvent) => {
+      // Update mouse position
       mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
       mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
+      // Cast ray from camera through mouse position
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(objects, true);
 
-      // Reset previous hovered object
+      // Reset previous hovered object to original rotation
       if (hoveredObject) {
-        hoveredObject.scale.divideScalar(1.4);
+        const original = (hoveredObject as any).originalRotation;
+        // Smooth transition back to original rotation
+        hoveredObject.rotation.x += (original.x - hoveredObject.rotation.x) * 0.1;
+        hoveredObject.rotation.y += (original.y - hoveredObject.rotation.y) * 0.1;
+        hoveredObject.rotation.z += (original.z - hoveredObject.rotation.z) * 0.1;
         hoveredObject = null;
       }
 
@@ -196,35 +206,37 @@ const Floating3DObjects: React.FC = () => {
 
         if (objects.includes(newHovered)) {
           hoveredObject = newHovered;
-          hoveredObject.scale.multiplyScalar(1.4);
+          
+          // Calculate direction from object to mouse position in 3D space
+          const mousePosition3D = new THREE.Vector3(mouse.x * 10, mouse.y * 10, 5);
+          const objectPosition = hoveredObject.position;
+          
+          // Create a direction vector from object to mouse
+          const direction = new THREE.Vector3().subVectors(mousePosition3D, objectPosition).normalize();
+          
+          // Calculate rotation to face the mouse
+          const targetRotation = new THREE.Euler();
+          targetRotation.setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(
+            new THREE.Vector3(0, 0, 1), // Default forward direction
+            direction
+          ));
+          
+          // Apply smooth rotation towards mouse
+          hoveredObject.rotation.x += (targetRotation.x - hoveredObject.rotation.x) * 0.05;
+          hoveredObject.rotation.y += (targetRotation.y - hoveredObject.rotation.y) * 0.05;
         }
       }
     };
 
     window.addEventListener('mousemove', onMouseMove);
 
-    // Animation loop
+    // Animation loop (only for smooth transitions, no continuous animation)
     const animate = () => {
       animationIdRef.current = requestAnimationFrame(animate);
 
-      objects.forEach((object, index) => {
-        // Floating animation
-        object.position.y = (object as any).initialY + 
-          Math.sin(Date.now() * (object as any).floatSpeed + index * 0.8) * 1.2;
-        
-        // Rotation animation
-        if (object !== hoveredObject) {
-          object.rotation.x += (object as any).rotationSpeed.x;
-          object.rotation.y += (object as any).rotationSpeed.y;
-          object.rotation.z += (object as any).rotationSpeed.z;
-        } else {
-          // Faster rotation when hovered
-          object.rotation.x += (object as any).rotationSpeed.x * 3;
-          object.rotation.y += (object as any).rotationSpeed.y * 3;
-          object.rotation.z += (object as any).rotationSpeed.z * 3;
-        }
-      });
-
+      // Only animate the hovered object's rotation transitions
+      // No floating or continuous rotation - objects stay static
+      
       renderer.render(scene, camera);
     };
 
