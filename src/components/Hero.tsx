@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { ArrowDown } from 'lucide-react';
+import Floating3DObjects from './Floating3DObjects';
 
 interface HeroProps {
   onPageChange: (page: string) => void;
@@ -13,12 +14,14 @@ const Hero: React.FC<HeroProps> = ({ onPageChange }) => {
         <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2260%22 height=%2260%22 viewBox=%220 0 60 60%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%23f5f5f5%22 fill-opacity=%220.4%22%3E%3Ccircle cx=%227%22 cy=%227%22 r=%221%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-20"></div>
       </div>
 
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-20 left-20 w-32 h-32 bg-gray-200/30 rounded-full animate-pulse"></div>
-        <div className="absolute bottom-32 right-32 w-24 h-24 bg-gray-300/20 rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/2 left-10 w-16 h-16 bg-blue-100/40 rounded-full animate-pulse" style={{ animationDelay: '2s' }}></div>
-      </div>
+      {/* 3D Ashtrays */}
+      <Suspense fallback={
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      }>
+        <Floating3DObjects />
+      </Suspense>
 
       {/* Hero Content */}
       <div className="relative z-10 text-center max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
