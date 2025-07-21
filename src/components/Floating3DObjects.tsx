@@ -1,8 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
-
-// Since GLTFLoader isn't available in the standard three package in this environment,
-// we'll create a simple fallback with basic 3D shapes that match the industrial aesthetic
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 const Floating3DObjects: React.FC = () => {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -10,6 +8,8 @@ const Floating3DObjects: React.FC = () => {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const animationIdRef = useRef<number>();
   const [isLoaded, setIsLoaded] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -46,46 +46,126 @@ const Floating3DObjects: React.FC = () => {
     directionalLight.castShadow = true;
     scene.add(directionalLight);
 
-    const pointLight = new THREE.PointLight(0x4a90a4, 0.3); // Steel blue accent
+    const pointLight = new THREE.PointLight(0x4a90a4, 0.3);
     pointLight.position.set(-10, 5, 5);
     scene.add(pointLight);
 
     camera.position.z = 15;
 
-    // Create industrial-looking objects as a fallback
-    const createIndustrialObjects = () => {
-      const objects: THREE.Object3D[] = [];
+    // Load GLTF model
+    const loader = new GLTFLoader();
+    const objects: THREE.Object3D[] = [];
 
-      // Create multiple instances of industrial-looking objects
+    const loadModel = async () => {
+      try {
+        // Load the ashtray model
+        const gltf = await new Promise<any>((resolve, reject) => {
+          loader.load(
+            '/models/ashtray.glb',
+            (gltf) => resolve(gltf),
+            (progress) => {
+              const percentComplete = (progress.loaded / progress.total) * 100;
+              setLoadingProgress(percentComplete);
+            },
+            (error) => reject(error)
+          );
+        });
+
+        const originalModel = gltf.scene;
+        
+        // Create multiple instances of the ashtray
+        for (let i = 0; i < 6; i++) {
+          const ashtray = originalModel.clone();
+          
+          // Random positions
+          ashtray.position.set(
+            (Math.random() - 0.5) * 25,
+            (Math.random() - 0.5) * 12,
+            (Math.random() - 0.5) * 12
+          );
+          
+          // Varied scale
+          const scale = 0.3 + Math.random() * 0.4;
+          ashtray.scale.setScalar(scale);
+          
+          // Random initial rotation
+          ashtray.rotation.set(
+            Math.random() * Math.PI,
+            Math.random() * Math.PI,
+            Math.random() * Math.PI
+          );
+
+          // Apply industrial materials with variation
+          const materials = [
+            new THREE.MeshPhongMaterial({ 
+              color: 0x2c2c2c, // Anthracite
+              shininess: 30,
+              specular: 0x222222
+            }),
+            new THREE.MeshPhongMaterial({ 
+              color: 0x1a1a1a, // Matte black
+              shininess: 10,
+              specular: 0x111111
+            }),
+            new THREE.MeshPhongMaterial({ 
+              color: 0x4a90a4, // Steel blue
+              shininess: 80,
+              specular: 0x4a90a4,
+              emissive: 0x1a3a4a,
+              emissiveIntensity: 0.1
+            }),
+            new THREE.MeshPhongMaterial({ 
+              color: 0xb8b8b8, // Brushed metal
+              shininess: 100,
+              specular: 0xffffff
+            }),
+          ];
+
+          // Apply material to all meshes in the model
+          ashtray.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+              const mesh = child as THREE.Mesh;
+              mesh.material = materials[i % materials.length];
+              mesh.castShadow = true;
+              mesh.receiveShadow = true;
+            }
+          });
+          
+          // Animation properties
+          (ashtray as any).initialY = ashtray.position.y;
+          (ashtray as any).floatSpeed = Math.random() * 0.015 + 0.01;
+          (ashtray as any).rotationSpeed = {
+            x: (Math.random() - 0.5) * 0.01,
+            y: (Math.random() - 0.5) * 0.015,
+            z: (Math.random() - 0.5) * 0.01,
+          };
+          
+          scene.add(ashtray);
+          objects.push(ashtray);
+        }
+
+        setIsLoaded(true);
+
+      } catch (err) {
+        console.error('Error loading GLTF model:', err);
+        setError('Unable to load 3D model');
+        // Fallback to basic shapes if GLTF fails
+        createFallbackObjects();
+      }
+    };
+
+    // Fallback function if GLTF loading fails
+    const createFallbackObjects = () => {
       for (let i = 0; i < 6; i++) {
         const group = new THREE.Group();
         
         // Create a cylindrical base (like an ashtray)
         const baseGeometry = new THREE.CylinderGeometry(1, 1.2, 0.3, 32);
         const materials = [
-          new THREE.MeshPhongMaterial({ 
-            color: 0x2c2c2c, // Anthracite
-            shininess: 30,
-            specular: 0x222222
-          }),
-          new THREE.MeshPhongMaterial({ 
-            color: 0x1a1a1a, // Matte black
-            shininess: 10,
-            specular: 0x111111
-          }),
-          new THREE.MeshPhongMaterial({ 
-            color: 0x4a90a4, // Steel blue
-            shininess: 80,
-            specular: 0x4a90a4,
-            emissive: 0x1a3a4a,
-            emissiveIntensity: 0.1
-          }),
-          new THREE.MeshPhongMaterial({ 
-            color: 0xb8b8b8, // Brushed metal
-            shininess: 100,
-            specular: 0xffffff,
-            metalness: 0.8
-          }),
+          new THREE.MeshPhongMaterial({ color: 0x2c2c2c, shininess: 30 }),
+          new THREE.MeshPhongMaterial({ color: 0x1a1a1a, shininess: 10 }),
+          new THREE.MeshPhongMaterial({ color: 0x4a90a4, shininess: 80 }),
+          new THREE.MeshPhongMaterial({ color: 0xb8b8b8, shininess: 100 }),
         ];
         
         const baseMesh = new THREE.Mesh(baseGeometry, materials[i % materials.length]);
@@ -100,21 +180,6 @@ const Floating3DObjects: React.FC = () => {
         rimMesh.castShadow = true;
         group.add(rimMesh);
         
-        // Add some industrial details (small cylinders as cigarette holders)
-        if (i % 2 === 0) {
-          for (let j = 0; j < 3; j++) {
-            const angle = (j / 3) * Math.PI * 2;
-            const holderGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.2, 16);
-            const holderMesh = new THREE.Mesh(holderGeometry, materials[2]);
-            holderMesh.position.set(
-              Math.cos(angle) * 0.7,
-              0.1,
-              Math.sin(angle) * 0.7
-            );
-            group.add(holderMesh);
-          }
-        }
-        
         // Random positions
         group.position.set(
           (Math.random() - 0.5) * 25,
@@ -122,18 +187,15 @@ const Floating3DObjects: React.FC = () => {
           (Math.random() - 0.5) * 12
         );
         
-        // Varied scale
         const scale = 0.5 + Math.random() * 0.5;
         group.scale.setScalar(scale);
         
-        // Random initial rotation
         group.rotation.set(
           Math.random() * Math.PI,
           Math.random() * Math.PI,
           Math.random() * Math.PI
         );
         
-        // Animation properties
         (group as any).initialY = group.position.y;
         (group as any).floatSpeed = Math.random() * 0.015 + 0.01;
         (group as any).rotationSpeed = {
@@ -145,11 +207,11 @@ const Floating3DObjects: React.FC = () => {
         scene.add(group);
         objects.push(group);
       }
-
-      return objects;
+      setIsLoaded(true);
     };
 
-    const objects = createIndustrialObjects();
+    // Start loading the model
+    loadModel();
 
     // Mouse interaction
     const raycaster = new THREE.Raycaster();
@@ -173,7 +235,7 @@ const Floating3DObjects: React.FC = () => {
       if (intersects.length > 0) {
         let newHovered = intersects[0].object;
         
-        // Find parent group
+        // Find parent group or model
         while (newHovered.parent && newHovered.parent !== scene) {
           newHovered = newHovered.parent;
         }
@@ -213,7 +275,6 @@ const Floating3DObjects: React.FC = () => {
     };
 
     animate();
-    setIsLoaded(true);
 
     // Handle resize
     const handleResize = () => {
@@ -257,16 +318,33 @@ const Floating3DObjects: React.FC = () => {
   }, []);
 
   return (
-    <div 
-      ref={mountRef} 
-      className={`absolute inset-0 transition-opacity duration-1000 ${
-        isLoaded ? 'opacity-100' : 'opacity-0'
-      }`}
-      style={{ 
-        pointerEvents: 'none',
-        zIndex: 1
-      }}
-    />
+    <>
+      <div 
+        ref={mountRef} 
+        className={`absolute inset-0 transition-opacity duration-1000 ${
+          isLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={{ 
+          pointerEvents: 'none',
+          zIndex: 1
+        }}
+      />
+      {!isLoaded && !error && (
+        <div className="absolute inset-0 flex items-center justify-center z-10">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mb-2"></div>
+            <p className="text-sm text-gray-600">Loading 3D model... {Math.round(loadingProgress)}%</p>
+          </div>
+        </div>
+      )}
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center z-10">
+          <div className="text-sm text-gray-500 bg-white bg-opacity-90 px-4 py-2 rounded">
+            {error}
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
