@@ -9,8 +9,6 @@ export const products: Product[] = [
     description: "Lampe de table au design industriel épuré, réalisée en béton lisse et métal brossé. Un parfait équilibre entre esthétisme minimaliste et fonctionnalité.",
     images: [
       "/articles/Surface-1.jpeg",
-      "/articles/Surface-2.jpeg",
-      "/articles/Surface-1.jpeg",
       "/articles/Surface-2.jpeg"
     ],
     specifications: {
