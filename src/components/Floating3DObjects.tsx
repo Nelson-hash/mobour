@@ -37,18 +37,26 @@ const Floating3DObjects: React.FC = () => {
     
     mountRef.current.appendChild(renderer.domElement);
 
-    // Lighting setup
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // Lighting setup optimized for white objects on concrete
+    const ambientLight = new THREE.AmbientLight(0xf0f0f0, 0.7); // Slightly warm ambient light
     scene.add(ambientLight);
     
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(10, 10, 5);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Stronger directional light
+    directionalLight.position.set(15, 15, 10);
     directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
     scene.add(directionalLight);
 
-    const pointLight = new THREE.PointLight(0x4a90a4, 0.4);
-    pointLight.position.set(-10, 5, 5);
-    scene.add(pointLight);
+    // Secondary light from the opposite side for fill lighting
+    const fillLight = new THREE.DirectionalLight(0xe8e8e8, 0.4);
+    fillLight.position.set(-10, 5, -5);
+    scene.add(fillLight);
+
+    // Subtle colored accent light for depth
+    const accentLight = new THREE.PointLight(0xd0d0d0, 0.3);
+    accentLight.position.set(0, 10, 0);
+    scene.add(accentLight);
 
     camera.position.z = 15;
 
