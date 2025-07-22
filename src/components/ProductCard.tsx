@@ -21,6 +21,21 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onViewProduct }) => 
     setCurrentImageIndex(0);
   };
 
+  // Special handling for Surface image to reduce zoom
+  const getImageStyle = () => {
+    if (product.name === 'Surface') {
+      return {
+        objectFit: 'cover' as const,
+        objectPosition: 'center',
+        transform: 'scale(0.75)', // Reduce zoom by 25%
+        transformOrigin: 'center'
+      };
+    }
+    return {
+      objectFit: 'cover' as const
+    };
+  };
+
   return (
     <div 
       className="group bg-white cursor-pointer"
@@ -33,7 +48,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onViewProduct }) => 
         <img
           src={product.images[currentImageIndex]}
           alt={product.name}
-          className="w-full h-full object-cover transition-all duration-300"
+          className="w-full h-full transition-all duration-300"
+          style={getImageStyle()}
           onMouseEnter={handleImageHover}
           onMouseLeave={handleImageLeave}
           loading="lazy"
