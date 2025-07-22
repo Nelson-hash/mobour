@@ -25,12 +25,12 @@ const Hero: React.FC<HeroProps> = ({ onPageChange }) => {
              style={{
                background: `linear-gradient(to bottom, 
                  transparent 0%, 
-                 transparent 60%, 
-                 rgba(255,255,255,0.1) 70%, 
-                 rgba(255,255,255,0.3) 80%, 
-                 rgba(255,255,255,0.6) 90%, 
-                 rgba(255,255,255,0.85) 95%, 
-                 rgba(255,255,255,1) 100%)`
+                 transparent 45%, 
+                 rgba(255,255,255,0.1) 55%, 
+                 rgba(255,255,255,0.3) 65%, 
+                 rgba(255,255,255,0.6) 75%, 
+                 rgba(255,255,255,0.85) 85%, 
+                 rgba(255,255,255,1) 90%)`
              }}>
         </div>
         
