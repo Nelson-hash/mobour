@@ -113,37 +113,18 @@ const Floating3DObjects: React.FC = () => {
             (Math.random() - 0.5) * Math.PI * 0.5
           );
 
-          // Apply different materials for variety
-          const materials = [
-            new THREE.MeshPhongMaterial({ 
-              color: 0x2c2c2c, // Dark anthracite
-              shininess: 40,
-              specular: 0x444444
-            }),
-            new THREE.MeshPhongMaterial({ 
-              color: 0x1a1a1a, // Deep black
-              shininess: 20,
-              specular: 0x222222
-            }),
-            new THREE.MeshPhongMaterial({ 
-              color: 0x4a90a4, // Steel blue
-              shininess: 80,
-              specular: 0x6bb0c4,
-              emissive: 0x0a2a34,
-              emissiveIntensity: 0.05
-            }),
-            new THREE.MeshPhongMaterial({ 
-              color: 0xb8b8b8, // Brushed metal
-              shininess: 120,
-              specular: 0xffffff
-            }),
-          ];
+          // Apply white material to all ashtrays
+          const whiteMaterial = new THREE.MeshPhongMaterial({ 
+            color: 0xffffff, // Pure white
+            shininess: 30,
+            specular: 0xcccccc
+          });
 
-          // Apply material to all meshes in the model
+          // Apply white material to all meshes in the model
           ashtray.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
               const mesh = child as THREE.Mesh;
-              mesh.material = materials[i % materials.length];
+              mesh.material = whiteMaterial;
               mesh.castShadow = true;
               mesh.receiveShadow = true;
             }
