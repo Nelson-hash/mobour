@@ -1,6 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 const Floating3DObjects: React.FC = () => {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -77,50 +76,76 @@ const Floating3DObjects: React.FC = () => {
 
     camera.position.z = getCameraDistance();
 
-    // Load GLTF model
-    const loader = new GLTFLoader();
+    // Create simple geometric ashtrays instead of loading GLTF
     const objects: THREE.Object3D[] = [];
     let hoveredObject: THREE.Object3D | null = null;
 
+    const createAshtray = () => {
+      const group = new THREE.Group();
+      
+      // Main body - cylinder
+      const bodyGeometry = new THREE.CylinderGeometry(2, 2.5, 0.5, 32);
+      const bodyMaterial = new THREE.MeshPhongMaterial({ 
+        color: 0xf8f8f8,
+        shininess: 15,
+        specular: 0x888888
+      });
+      const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+      body.position.y = 0.25;
+      group.add(body);
+      
+      // Inner depression
+      const innerGeometry = new THREE.CylinderGeometry(1.5, 1.8, 0.3, 32);
+      const innerMaterial = new THREE.MeshPhongMaterial({ 
+        color: 0xe8e8e8,
+        shininess: 10
+      });
+      const inner = new THREE.Mesh(innerGeometry, innerMaterial);
+      inner.position.y = 0.35;
+      group.add(inner);
+      
+      // Small notches for cigarettes (3 of them)
+      for (let i = 0; i < 3; i++) {
+        const notchGeometry = new THREE.BoxGeometry(0.3, 0.2, 0.1);
+        const notch = new THREE.Mesh(notchGeometry, bodyMaterial);
+        const angle = (i / 3) * Math.PI * 2;
+        notch.position.x = Math.cos(angle) * 2.2;
+        notch.position.z = Math.sin(angle) * 2.2;
+        notch.position.y = 0.4;
+        group.add(notch);
+      }
+      
+      if (!isMobile) {
+        body.castShadow = true;
+        body.receiveShadow = true;
+        inner.castShadow = true;
+        inner.receiveShadow = true;
+      }
+      
+      return group;
+    };
+
     const loadModel = async () => {
       try {
-        console.log('Loading ashtray model...');
-        
-        // Load the ashtray model once
-        const gltf = await new Promise<any>((resolve, reject) => {
-          loader.load(
-            '/models/ashtray.glb',
-            (gltf) => {
-              console.log('Model loaded successfully:', gltf);
-              resolve(gltf);
-            },
-            undefined,
-            (error) => {
-              console.error('Error loading model:', error);
-              reject(error);
-            }
-          );
-        });
+        console.log('Creating geometric ashtrays...');
 
-        const originalModel = gltf.scene;
-        
-        // Responsive positioning - closer together on mobile
+        // Responsive positioning - only 5 ashtrays (center + 4 corners)
         const getResponsivePositions = () => {
           const scale = window.innerWidth < 768 ? 0.7 : 1; // Closer on mobile
           return [
-            { x: -32 * scale, y: 15 * scale, z: -8 * scale, rotX: 0.1, rotY: 0.3, rotZ: 0.2 },
-            { x: 30 * scale, y: 16 * scale, z: -6 * scale, rotX: -0.2, rotY: -0.4, rotZ: 0.1 },
-            { x: -3 * scale, y: -2 * scale, z: 5 * scale, rotX: 0.3, rotY: 1.2, rotZ: -0.1 },
-            { x: -22 * scale, y: -6 * scale, z: 8 * scale, rotX: -0.1, rotY: 0.3, rotZ: 0.2 }, // Moved from -12 to -6 (higher)
-            { x: 20 * scale, y: -8 * scale, z: 12 * scale, rotX: 0.1, rotY: -0.6, rotZ: -0.2 }
+            { x: -32 * scale, y: 15 * scale, z: -8 * scale, rotX: 0.1, rotY: 0.3, rotZ: 0.2 }, // Top left
+            { x: 30 * scale, y: 16 * scale, z: -6 * scale, rotX: -0.2, rotY: -0.4, rotZ: 0.1 }, // Top right
+            { x: -3 * scale, y: -2 * scale, z: 5 * scale, rotX: 0.3, rotY: 1.2, rotZ: -0.1 }, // Center
+            { x: -22 * scale, y: -6 * scale, z: 8 * scale, rotX: -0.1, rotY: 0.3, rotZ: 0.2 }, // Bottom left
+            { x: 20 * scale, y: -8 * scale, z: 12 * scale, rotX: 0.1, rotY: -0.6, rotZ: -0.2 } // Bottom right
           ];
         };
 
         const positions = getResponsivePositions();
 
-        // Create all ashtrays with simple fade-in
-        for (let i = 0; i < 7; i++) {
-          const ashtray = originalModel.clone();
+        // Create 5 ashtrays with simple fade-in
+        for (let i = 0; i < 5; i++) {
+          const ashtray = createAshtray();
           const pos = positions[i];
           
           // Set final positions immediately
@@ -136,23 +161,13 @@ const Floating3DObjects: React.FC = () => {
           const scale = getResponsiveScale(i);
           ashtray.scale.setScalar(scale);
 
-          // Apply ceramic material with performance optimization
-          const ceramicMaterial = new THREE.MeshPhongMaterial({ 
-            color: 0xf8f8f8,
-            shininess: 15,
-            specular: 0x888888,
-            transparent: true,
-            opacity: 0
-          });
-
+          // Set initial opacity to 0
           ashtray.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
               const mesh = child as THREE.Mesh;
-              mesh.material = ceramicMaterial;
-              if (!isMobile) {
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
-              }
+              const material = mesh.material as THREE.MeshPhongMaterial;
+              material.transparent = true;
+              material.opacity = 0;
             }
           });
           
@@ -187,7 +202,7 @@ const Floating3DObjects: React.FC = () => {
               const easedProgress = easeOutCubic(progress);
               
               ashtray.traverse((child) => {
-                if ((child as THREE.Mesh).isMesh && (child as THREE.Mesh).material) {
+                if ((child as THREE.Mesh).isMesh) {
                   const material = (child as THREE.Mesh).material as THREE.MeshPhongMaterial;
                   material.opacity = easedProgress;
                 }
@@ -197,7 +212,7 @@ const Floating3DObjects: React.FC = () => {
                 requestAnimationFrame(fadeIn);
               } else {
                 ashtray.traverse((child) => {
-                  if ((child as THREE.Mesh).isMesh && (child as THREE.Mesh).material) {
+                  if ((child as THREE.Mesh).isMesh) {
                     const material = (child as THREE.Mesh).material as THREE.MeshPhongMaterial;
                     material.transparent = false;
                     material.opacity = 1;
@@ -213,12 +228,12 @@ const Floating3DObjects: React.FC = () => {
         setIsLoaded(true);
 
       } catch (err) {
-        console.error('Failed to load GLTF model:', err);
-        setError(`Model loading failed: ${err}`);
+        console.error('Failed to create ashtrays:', err);
+        setError(`Ashtray creation failed: ${err}`);
       }
     };
 
-    // Start loading the model
+    // Start creating the ashtrays
     loadModel();
 
     // Responsive mouse/touch interaction
@@ -412,9 +427,9 @@ const Floating3DObjects: React.FC = () => {
       {error && (
         <div className="absolute inset-0 flex items-center justify-center z-10">
           <div className="text-center bg-white bg-opacity-90 px-6 py-4 rounded-lg shadow-lg">
-            <p className="text-red-600 font-medium mb-2">3D Model Error</p>
+            <p className="text-red-600 font-medium mb-2">3D Creation Error</p>
             <p className="text-sm text-gray-600 mb-4">Check console for details</p>
-            <p className="text-xs text-gray-500">Make sure ashtray.glb is in /public/models/</p>
+            <p className="text-xs text-gray-500">Geometric ashtrays creation failed</p>
           </div>
         </div>
       )}
