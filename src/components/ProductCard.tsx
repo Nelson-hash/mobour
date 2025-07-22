@@ -21,16 +21,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onViewProduct }) => 
     setCurrentImageIndex(0);
   };
 
-  // Special handling for Surface image to reduce zoom
+  // Reset to normal image handling - no special Surface treatment
   const getImageStyle = () => {
-    if (product.name === 'Surface') {
-      return {
-        objectFit: 'cover' as const,
-        objectPosition: 'center',
-        transform: 'scale(0.75)', // Reduce zoom by 25%
-        transformOrigin: 'center'
-      };
-    }
     return {
       objectFit: 'cover' as const
     };
