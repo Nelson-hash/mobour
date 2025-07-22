@@ -58,7 +58,7 @@ const Floating3DObjects: React.FC = () => {
     accentLight.position.set(0, 10, 0);
     scene.add(accentLight);
 
-    camera.position.z = 25; // Moved camera further back to see all larger ashtrays
+    camera.position.z = 30; // Moved camera even further back to see all 7 ashtrays including top corners
 
     // Load GLTF model
     const loader = new GLTFLoader();
@@ -92,8 +92,10 @@ const Floating3DObjects: React.FC = () => {
         const originalModel = gltf.scene;
         console.log('Original model:', originalModel);
         
-        // Create exactly 5 white ashtrays in specific positions and orientations (much larger and further apart)
+        // Create exactly 7 white ashtrays in specific positions and orientations (with 2 additional top ashtrays)
         const positions = [
+          { x: -32, y: 15, z: -8, rotX: 0.1, rotY: 0.3, rotZ: 0.2 },    // Far top left (new)
+          { x: 30, y: 16, z: -6, rotX: -0.2, rotY: -0.4, rotZ: 0.1 },   // Far top right (new)
           { x: -20, y: 8, z: -12, rotX: 0.2, rotY: 0.5, rotZ: 0 },      // Top left
           { x: 18, y: 6, z: -10, rotX: 0, rotY: -0.8, rotZ: 0.1 },      // Top right  
           { x: -3, y: -2, z: 5, rotX: 0.3, rotY: 1.2, rotZ: -0.1 },     // Center
@@ -101,7 +103,7 @@ const Floating3DObjects: React.FC = () => {
           { x: 20, y: -8, z: 12, rotX: 0.1, rotY: -0.6, rotZ: -0.2 }    // Bottom right
         ];
 
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 7; i++) {
           const ashtray = originalModel.clone();
           const pos = positions[i];
           
@@ -113,7 +115,7 @@ const Floating3DObjects: React.FC = () => {
           
           // 5 times bigger scales with slight variation
           const baseScale = 4.0; // 5x bigger than before (was 0.8)
-          const scale = baseScale + (i * 0.2); // Scales from 4.0 to 4.8 (5x bigger)
+          const scale = baseScale + (i * 0.1); // Scales from 4.0 to 4.6
           ashtray.scale.setScalar(scale);
 
           // Apply ceramic-like white material
@@ -135,18 +137,25 @@ const Floating3DObjects: React.FC = () => {
             }
           });
           
-          // Store original rotation for smooth transitions
+          // Store original rotation for mouse interaction
           (ashtray as any).originalRotation = {
             x: ashtray.rotation.x,
             y: ashtray.rotation.y,
             z: ashtray.rotation.z
+          };
+
+          // Add unique spinning properties for space-like rotation
+          (ashtray as any).spinSpeed = {
+            x: (Math.random() - 0.5) * 0.02, // Random X rotation speed
+            y: (Math.random() - 0.5) * 0.03, // Random Y rotation speed  
+            z: (Math.random() - 0.5) * 0.025  // Random Z rotation speed
           };
           
           scene.add(ashtray);
           objects.push(ashtray);
         }
 
-        console.log('5 ceramic ashtrays added to scene');
+        console.log('7 spinning ceramic ashtrays added to scene');
         setIsLoaded(true);
 
       } catch (err) {
@@ -171,14 +180,9 @@ const Floating3DObjects: React.FC = () => {
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(objects, true);
 
-      // Reset previous hovered object to original rotation
+      // Reset previous hovered object (let it continue normal spinning)
       if (hoveredObject) {
-        const original = (hoveredObject as any).originalRotation;
-        // Smooth transition back to original rotation
-        hoveredObject.rotation.x += (original.x - hoveredObject.rotation.x) * 0.1;
-        hoveredObject.rotation.y += (original.y - hoveredObject.rotation.y) * 0.1;
-        hoveredObject.rotation.z += (original.z - hoveredObject.rotation.z) * 0.1;
-        hoveredObject = null;
+        hoveredObject = null; // Just clear hover, spinning continues in animate loop
       }
 
       // Handle new hover
@@ -192,36 +196,48 @@ const Floating3DObjects: React.FC = () => {
 
         if (objects.includes(newHovered)) {
           hoveredObject = newHovered;
-          
-          // Calculate direction from object to mouse position in 3D space
-          const mousePosition3D = new THREE.Vector3(mouse.x * 10, mouse.y * 10, 5);
-          const objectPosition = hoveredObject.position;
-          
-          // Create a direction vector from object to mouse
-          const direction = new THREE.Vector3().subVectors(mousePosition3D, objectPosition).normalize();
-          
-          // Calculate rotation to face the mouse
-          const targetRotation = new THREE.Euler();
-          targetRotation.setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(
-            new THREE.Vector3(0, 0, 1), // Default forward direction
-            direction
-          ));
-          
-          // Apply smooth rotation towards mouse
-          hoveredObject.rotation.x += (targetRotation.x - hoveredObject.rotation.x) * 0.05;
-          hoveredObject.rotation.y += (targetRotation.y - hoveredObject.rotation.y) * 0.05;
+          // Mouse interaction logic is now handled in the animate loop
         }
       }
     };
 
     window.addEventListener('mousemove', onMouseMove);
 
-    // Animation loop (only for smooth transitions, no continuous animation)
+    // Animation loop with constant spinning like objects in space
     const animate = () => {
       animationIdRef.current = requestAnimationFrame(animate);
 
-      // Only animate the hovered object's rotation transitions
-      // No floating or continuous rotation - objects stay static
+      // Constant spinning animation for all ashtrays
+      objects.forEach((object, index) => {
+        const spinSpeed = (object as any).spinSpeed;
+        
+        if (object !== hoveredObject) {
+          // Normal space-like spinning
+          object.rotation.x += spinSpeed.x;
+          object.rotation.y += spinSpeed.y;
+          object.rotation.z += spinSpeed.z;
+        } else {
+          // When hovered, still spin but also follow mouse
+          object.rotation.x += spinSpeed.x * 0.3; // Slower spin when hovered
+          object.rotation.y += spinSpeed.y * 0.3;
+          object.rotation.z += spinSpeed.z * 0.3;
+          
+          // Add mouse-following behavior on top of spinning
+          const mousePosition3D = new THREE.Vector3(mouse.x * 15, mouse.y * 15, 8);
+          const objectPosition = object.position;
+          const direction = new THREE.Vector3().subVectors(mousePosition3D, objectPosition).normalize();
+          
+          const targetRotation = new THREE.Euler();
+          targetRotation.setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(
+            new THREE.Vector3(0, 0, 1),
+            direction
+          ));
+          
+          // Gently influence rotation towards mouse (mixed with spinning)
+          object.rotation.x += (targetRotation.x - object.rotation.x) * 0.02;
+          object.rotation.y += (targetRotation.y - object.rotation.y) * 0.02;
+        }
+      });
       
       renderer.render(scene, camera);
     };
