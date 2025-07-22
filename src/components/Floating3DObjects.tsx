@@ -92,47 +92,43 @@ const Floating3DObjects: React.FC = () => {
         const originalModel = gltf.scene;
         console.log('Original model:', originalModel);
         
-        // Create 12 static ashtrays in a nice distribution
-        for (let i = 0; i < 12; i++) {
-          const ashtray = originalModel.clone();
-          
-          // Arrange in a more organized pattern
-          const angle = (i / 12) * Math.PI * 2;
-          const radius1 = 8 + Math.random() * 6;
-          const radius2 = 15 + Math.random() * 8;
-          const useInnerRing = i < 6;
-          const radius = useInnerRing ? radius1 : radius2;
-          
-          // Position ashtrays in two rings with some randomness
-          ashtray.position.set(
-            Math.cos(angle + (Math.random() - 0.5) * 0.5) * radius,
-            (Math.random() - 0.5) * 8, // Some vertical variation
-            Math.sin(angle + (Math.random() - 0.5) * 0.5) * radius
-          );
-          
-          // Varied scale
-          const scale = 0.4 + Math.random() * 0.6;
-          ashtray.scale.setScalar(scale);
-          
-          // Random initial rotation (but they will stay static)
-          ashtray.rotation.set(
-            (Math.random() - 0.5) * Math.PI * 0.5,
-            Math.random() * Math.PI * 2,
-            (Math.random() - 0.5) * Math.PI * 0.5
-          );
+        // Create exactly 5 white ashtrays in specific positions and orientations
+        const positions = [
+          { x: -8, y: 2, z: -3, rotX: 0.2, rotY: 0.5, rotZ: 0 },      // Top left
+          { x: 6, y: 1, z: -2, rotX: 0, rotY: -0.8, rotZ: 0.1 },      // Top right  
+          { x: -2, y: -1, z: 2, rotX: 0.3, rotY: 1.2, rotZ: -0.1 },   // Center
+          { x: -9, y: -3, z: 1, rotX: -0.1, rotY: 0.3, rotZ: 0.2 },   // Bottom left
+          { x: 7, y: -2, z: 3, rotX: 0.1, rotY: -0.6, rotZ: -0.2 }    // Bottom right
+        ];
 
-          // Apply white material to all ashtrays
-          const whiteMaterial = new THREE.MeshPhongMaterial({ 
-            color: 0xffffff, // Pure white
-            shininess: 30,
-            specular: 0xcccccc
+        for (let i = 0; i < 5; i++) {
+          const ashtray = originalModel.clone();
+          const pos = positions[i];
+          
+          // Set specific positions
+          ashtray.position.set(pos.x, pos.y, pos.z);
+          
+          // Set specific orientations for variety
+          ashtray.rotation.set(pos.rotX, pos.rotY, pos.rotZ);
+          
+          // Slightly varied scales for natural look
+          const scale = 0.8 + (i * 0.1); // Scales from 0.8 to 1.2
+          ashtray.scale.setScalar(scale);
+
+          // Apply ceramic-like white material
+          const ceramicMaterial = new THREE.MeshPhongMaterial({ 
+            color: 0xf8f8f8, // Slightly off-white like ceramic
+            shininess: 15,   // Lower shininess for matte ceramic look
+            specular: 0x888888, // Subtle specular highlights
+            transparent: false,
+            opacity: 1.0
           });
 
-          // Apply white material to all meshes in the model
+          // Apply ceramic material to all meshes in the model
           ashtray.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
               const mesh = child as THREE.Mesh;
-              mesh.material = whiteMaterial;
+              mesh.material = ceramicMaterial;
               mesh.castShadow = true;
               mesh.receiveShadow = true;
             }
@@ -149,7 +145,7 @@ const Floating3DObjects: React.FC = () => {
           objects.push(ashtray);
         }
 
-        console.log('All ashtrays added to scene:', objects.length);
+        console.log('5 ceramic ashtrays added to scene');
         setIsLoaded(true);
 
       } catch (err) {
