@@ -8,7 +8,6 @@ const Floating3DObjects: React.FC = () => {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const animationIdRef = useRef<number>();
   const [isLoaded, setIsLoaded] = useState(false);
-  const [loadedCount, setLoadedCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -77,9 +76,7 @@ const Floating3DObjects: React.FC = () => {
               console.log('Model loaded successfully:', gltf);
               resolve(gltf);
             },
-            (progress) => {
-              // We don't need to show loading progress anymore
-            },
+            undefined, // No progress callback
             (error) => {
               console.error('Error loading model:', error);
               reject(error);
@@ -88,12 +85,11 @@ const Floating3DObjects: React.FC = () => {
         });
 
         const originalModel = gltf.scene;
-        console.log('Original model:', originalModel);
         
-        // Create exactly 7 white ashtrays in specific positions and orientations (with 2 additional top ashtrays)
+        // Create exactly 7 white ashtrays in specific positions and orientations
         const positions = [
-          { x: -32, y: 15, z: -8, rotX: 0.1, rotY: 0.3, rotZ: 0.2 },    // Far top left (new)
-          { x: 30, y: 16, z: -6, rotX: -0.2, rotY: -0.4, rotZ: 0.1 },   // Far top right (new)
+          { x: -32, y: 15, z: -8, rotX: 0.1, rotY: 0.3, rotZ: 0.2 },    // Far top left
+          { x: 30, y: 16, z: -6, rotX: -0.2, rotY: -0.4, rotZ: 0.1 },   // Far top right
           { x: -20, y: 8, z: -12, rotX: 0.2, rotY: 0.5, rotZ: 0 },      // Top left
           { x: 18, y: 6, z: -10, rotX: 0, rotY: -0.8, rotZ: 0.1 },      // Top right  
           { x: -3, y: -2, z: 5, rotX: 0.3, rotY: 1.2, rotZ: -0.1 },     // Center
@@ -101,37 +97,28 @@ const Floating3DObjects: React.FC = () => {
           { x: 20, y: -8, z: 12, rotX: 0.1, rotY: -0.6, rotZ: -0.2 }    // Bottom right
         ];
 
-        // Create ashtrays progressively with delays
+        // Create all ashtrays first (invisible)
         for (let i = 0; i < 7; i++) {
-          // Add delay between each ashtray creation
-          if (i > 0) {
-            await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300)); // Random delay 200-500ms
-          }
-
           const ashtray = originalModel.clone();
           const pos = positions[i];
           
-          // Set specific positions (much further apart)
+          // Set final positions
           ashtray.position.set(pos.x, pos.y, pos.z);
-          
-          // Set specific orientations for variety
           ashtray.rotation.set(pos.rotX, pos.rotY, pos.rotZ);
           
-          // 5 times bigger scales with slight variation
-          const baseScale = 4.0; // 5x bigger than before (was 0.8)
-          const scale = baseScale + (i * 0.1); // Scales from 4.0 to 4.6
+          const baseScale = 4.0;
+          const scale = baseScale + (i * 0.1);
           ashtray.scale.setScalar(scale);
 
-          // Apply ceramic-like white material
+          // Apply ceramic material
           const ceramicMaterial = new THREE.MeshPhongMaterial({ 
-            color: 0xf8f8f8, // Slightly off-white like ceramic
-            shininess: 15,   // Lower shininess for matte ceramic look
-            specular: 0x888888, // Subtle specular highlights
+            color: 0xf8f8f8,
+            shininess: 15,
+            specular: 0x888888,
             transparent: false,
             opacity: 1.0
           });
 
-          // Apply ceramic material to all meshes in the model
           ashtray.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
               const mesh = child as THREE.Mesh;
@@ -141,50 +128,96 @@ const Floating3DObjects: React.FC = () => {
             }
           });
           
-          // Store original rotation for mouse interaction
+          // Store properties
           (ashtray as any).originalRotation = {
             x: ashtray.rotation.x,
             y: ashtray.rotation.y,
             z: ashtray.rotation.z
           };
 
-          // Add unique spinning properties for space-like rotation
           (ashtray as any).spinSpeed = {
-            x: (Math.random() - 0.5) * 0.02, // Random X rotation speed
-            y: (Math.random() - 0.5) * 0.03, // Random Y rotation speed  
-            z: (Math.random() - 0.5) * 0.025  // Random Z rotation speed
+            x: (Math.random() - 0.5) * 0.02,
+            y: (Math.random() - 0.5) * 0.03,
+            z: (Math.random() - 0.5) * 0.025
           };
 
-          // Start with scale 0 for smooth appearance animation
+          // Store final position and start from bottom
+          (ashtray as any).finalPosition = { x: pos.x, y: pos.y, z: pos.z };
+          (ashtray as any).finalScale = scale;
+          
+          // Start invisible and below screen
+          ashtray.position.y = -50; // Way below
           ashtray.scale.setScalar(0);
+          (ashtray as any).isAnimating = false;
+          (ashtray as any).hasLanded = false;
           
           scene.add(ashtray);
           objects.push(ashtray);
-          
-          // Animate the ashtray appearing
-          const targetScale = scale;
-          const animateAppearance = () => {
-            const currentScale = ashtray.scale.x;
-            if (currentScale < targetScale) {
-              const newScale = currentScale + (targetScale * 0.08); // Smooth scale-up
-              ashtray.scale.setScalar(Math.min(newScale, targetScale));
-              requestAnimationFrame(animateAppearance);
-            }
-          };
-          animateAppearance();
-          
-          // Update loaded count for UI
-          setLoadedCount(i + 1);
-          console.log(`Ashtray ${i + 1}/7 added and appearing...`);
         }
 
-        console.log('7 spinning ceramic ashtrays added to scene');
         setIsLoaded(true);
+
+        // Start entrance animations with delays
+        objects.forEach((ashtray, index) => {
+          setTimeout(() => {
+            animateAshtrayEntrance(ashtray as any, index);
+          }, index * 400); // 400ms delay between each
+        });
 
       } catch (err) {
         console.error('Failed to load GLTF model:', err);
         setError(`Model loading failed: ${err}`);
       }
+    };
+
+    // Animate ashtray entrance from bottom
+    const animateAshtrayEntrance = (ashtray: any, index: number) => {
+      ashtray.isAnimating = true;
+      
+      const startTime = Date.now();
+      const duration = 1200 + Math.random() * 400; // 1.2-1.6 seconds
+      const startY = -50;
+      const finalY = ashtray.finalPosition.y;
+      const overshoot = finalY + 3; // Slight bounce overshoot
+      
+      const animateUp = () => {
+        if (!ashtray.isAnimating) return;
+        
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Easing function for bouncy landing
+        const easeOutBounce = (t: number) => {
+          if (t < 0.7) {
+            // Rising phase - ease out
+            return 1 - Math.pow(1 - (t / 0.7), 3);
+          } else {
+            // Landing phase - small bounce
+            const bounceProgress = (t - 0.7) / 0.3;
+            return 1 + Math.sin(bounceProgress * Math.PI) * 0.1 * (1 - bounceProgress);
+          }
+        };
+        
+        const easedProgress = easeOutBounce(progress);
+        
+        // Animate position
+        ashtray.position.y = startY + (finalY - startY) * easedProgress;
+        
+        // Animate scale
+        ashtray.scale.setScalar(ashtray.finalScale * Math.min(progress * 1.5, 1));
+        
+        if (progress < 1) {
+          requestAnimationFrame(animateUp);
+        } else {
+          // Landing complete
+          ashtray.position.y = finalY;
+          ashtray.scale.setScalar(ashtray.finalScale);
+          ashtray.isAnimating = false;
+          ashtray.hasLanded = true;
+        }
+      };
+      
+      animateUp();
     };
 
     // Start loading the model
@@ -226,40 +259,46 @@ const Floating3DObjects: React.FC = () => {
 
     window.addEventListener('mousemove', onMouseMove);
 
-    // Animation loop with constant spinning like objects in space
+    // Animation loop with entrance animations and space spinning
     const animate = () => {
       animationIdRef.current = requestAnimationFrame(animate);
 
-      // Constant spinning animation for all ashtrays
+      // Handle both entrance animations and space spinning
       objects.forEach((object, index) => {
-        const spinSpeed = (object as any).spinSpeed;
+        const ashtray = object as any;
         
-        if (object !== hoveredObject) {
-          // Normal space-like spinning
-          object.rotation.x += spinSpeed.x;
-          object.rotation.y += spinSpeed.y;
-          object.rotation.z += spinSpeed.z;
-        } else {
-          // When hovered, still spin but also follow mouse
-          object.rotation.x += spinSpeed.x * 0.3; // Slower spin when hovered
-          object.rotation.y += spinSpeed.y * 0.3;
-          object.rotation.z += spinSpeed.z * 0.3;
+        // Only apply spinning if the ashtray has landed and isn't animating entrance
+        if (ashtray.hasLanded && !ashtray.isAnimating) {
+          const spinSpeed = ashtray.spinSpeed;
           
-          // Add mouse-following behavior on top of spinning
-          const mousePosition3D = new THREE.Vector3(mouse.x * 15, mouse.y * 15, 8);
-          const objectPosition = object.position;
-          const direction = new THREE.Vector3().subVectors(mousePosition3D, objectPosition).normalize();
-          
-          const targetRotation = new THREE.Euler();
-          targetRotation.setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(
-            new THREE.Vector3(0, 0, 1),
-            direction
-          ));
-          
-          // Gently influence rotation towards mouse (mixed with spinning)
-          object.rotation.x += (targetRotation.x - object.rotation.x) * 0.02;
-          object.rotation.y += (targetRotation.y - object.rotation.y) * 0.02;
+          if (object !== hoveredObject) {
+            // Normal space-like spinning
+            object.rotation.x += spinSpeed.x;
+            object.rotation.y += spinSpeed.y;
+            object.rotation.z += spinSpeed.z;
+          } else {
+            // When hovered, still spin but also follow mouse
+            object.rotation.x += spinSpeed.x * 0.3; // Slower spin when hovered
+            object.rotation.y += spinSpeed.y * 0.3;
+            object.rotation.z += spinSpeed.z * 0.3;
+            
+            // Add mouse-following behavior on top of spinning
+            const mousePosition3D = new THREE.Vector3(mouse.x * 15, mouse.y * 15, 8);
+            const objectPosition = object.position;
+            const direction = new THREE.Vector3().subVectors(mousePosition3D, objectPosition).normalize();
+            
+            const targetRotation = new THREE.Euler();
+            targetRotation.setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(
+              new THREE.Vector3(0, 0, 1),
+              direction
+            ));
+            
+            // Gently influence rotation towards mouse (mixed with spinning)
+            object.rotation.x += (targetRotation.x - object.rotation.x) * 0.02;
+            object.rotation.y += (targetRotation.y - object.rotation.y) * 0.02;
+          }
         }
+        // If animating entrance or not landed yet, the entrance animation handles positioning
       });
       
       renderer.render(scene, camera);
@@ -320,24 +359,6 @@ const Floating3DObjects: React.FC = () => {
           zIndex: 1
         }}
       />
-      {loadedCount > 0 && loadedCount < 7 && (
-        <div className="absolute bottom-8 right-8 z-10">
-          <div className="bg-white bg-opacity-20 backdrop-blur-sm px-4 py-2 rounded-lg">
-            <div className="flex items-center space-x-2 text-gray-700">
-              <div className="w-2 h-2 bg-gray-600 rounded-full animate-pulse"></div>
-              <span className="text-sm font-medium">{loadedCount}/7</span>
-            </div>
-          </div>
-        </div>
-      )}
-      {!isLoaded && !error && loadedCount === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center z-10">
-          <div className="text-center">
-            <div className="w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mb-2"></div>
-            <p className="text-sm text-gray-600">Preparing scene...</p>
-          </div>
-        </div>
-      )}
       {error && (
         <div className="absolute inset-0 flex items-center justify-center z-10">
           <div className="text-center bg-white bg-opacity-90 px-6 py-4 rounded-lg shadow-lg">
