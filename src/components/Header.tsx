@@ -33,22 +33,17 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
             MOBOUR
           </div>
 
-          {/* Centered Logo */}
+          {/* Centered Logo - Your SVG Logo */}
           <div className="absolute left-1/2 transform -translate-x-1/2">
             <div 
               className="cursor-pointer hover:opacity-75 transition-opacity"
               onClick={() => onPageChange('home')}
             >
-              <svg 
-                width="40" 
-                height="40" 
-                viewBox="0 0 40 40" 
-                className="fill-current text-gray-900"
-              >
-                <rect x="4" y="4" width="32" height="32" rx="3" stroke="currentColor" strokeWidth="2" fill="none"/>
-                <circle cx="20" cy="20" r="8" fill="currentColor"/>
-                <circle cx="20" cy="20" r="4" fill="white"/>
-              </svg>
+              <img 
+                src="/logo.svg" 
+                alt="MOBOUR" 
+                className="h-12 w-auto"
+              />
             </div>
           </div>
 
