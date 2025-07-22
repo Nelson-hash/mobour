@@ -25,25 +25,34 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
     <header className="absolute top-0 left-0 right-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo - Centered SVG with MOBOUR text on left */}
+          {/* MOBOUR Text - Left */}
           <div 
-            className="flex items-center space-x-3 cursor-pointer hover:opacity-75 transition-opacity"
+            className="text-2xl font-bold text-gray-900 cursor-pointer hover:opacity-75 transition-opacity"
             onClick={() => onPageChange('home')}
           >
-            <span className="text-2xl font-bold text-gray-900">MOBOUR</span>
-            <svg 
-              width="32" 
-              height="32" 
-              viewBox="0 0 32 32" 
-              className="fill-current text-gray-900"
-            >
-              <rect x="4" y="4" width="24" height="24" rx="2" stroke="currentColor" strokeWidth="2" fill="none"/>
-              <circle cx="16" cy="16" r="6" fill="currentColor"/>
-              <circle cx="16" cy="16" r="3" fill="white"/>
-            </svg>
+            MOBOUR
           </div>
 
-          {/* Burger Menu Button */}
+          {/* Centered Logo */}
+          <div className="absolute left-1/2 transform -translate-x-1/2">
+            <div 
+              className="cursor-pointer hover:opacity-75 transition-opacity"
+              onClick={() => onPageChange('home')}
+            >
+              <svg 
+                width="40" 
+                height="40" 
+                viewBox="0 0 40 40" 
+                className="fill-current text-gray-900"
+              >
+                <rect x="4" y="4" width="32" height="32" rx="3" stroke="currentColor" strokeWidth="2" fill="none"/>
+                <circle cx="20" cy="20" r="8" fill="currentColor"/>
+                <circle cx="20" cy="20" r="4" fill="white"/>
+              </svg>
+            </div>
+          </div>
+
+          {/* Burger Menu Button - Right */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
