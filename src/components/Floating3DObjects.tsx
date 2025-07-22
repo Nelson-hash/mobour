@@ -97,12 +97,12 @@ const Floating3DObjects: React.FC = () => {
           { x: 20, y: -8, z: 12, rotX: 0.1, rotY: -0.6, rotZ: -0.2 }    // Bottom right
         ];
 
-        // Create all ashtrays first (invisible)
+        // Create all ashtrays with simple fade-in
         for (let i = 0; i < 7; i++) {
           const ashtray = originalModel.clone();
           const pos = positions[i];
           
-          // Set final positions
+          // Set final positions immediately
           ashtray.position.set(pos.x, pos.y, pos.z);
           ashtray.rotation.set(pos.rotX, pos.rotY, pos.rotZ);
           
@@ -115,8 +115,8 @@ const Floating3DObjects: React.FC = () => {
             color: 0xf8f8f8,
             shininess: 15,
             specular: 0x888888,
-            transparent: false,
-            opacity: 1.0
+            transparent: true, // Enable transparency for fade
+            opacity: 0 // Start invisible
           });
 
           ashtray.traverse((child) => {
@@ -141,84 +141,45 @@ const Floating3DObjects: React.FC = () => {
             z: (Math.random() - 0.5) * 0.025
           };
 
-          // Store final position and start from bottom
-          (ashtray as any).finalPosition = { x: pos.x, y: pos.y, z: pos.z };
-          (ashtray as any).finalScale = scale;
-          
-          // Start invisible and below screen
-          ashtray.position.y = -50; // Way below
-          ashtray.scale.setScalar(0);
-          (ashtray as any).isAnimating = false;
-          (ashtray as any).hasLanded = false;
-          
           scene.add(ashtray);
           objects.push(ashtray);
+
+          // Simple fade-in with delay
+          setTimeout(() => {
+            const startTime = Date.now();
+            const fadeDuration = 800; // 800ms fade
+
+            const fadeIn = () => {
+              const elapsed = Date.now() - startTime;
+              const progress = Math.min(elapsed / fadeDuration, 1);
+              
+              // Update opacity of all materials in the ashtray
+              ashtray.traverse((child) => {
+                if ((child as THREE.Mesh).isMesh && (child as THREE.Mesh).material) {
+                  const material = (child as THREE.Mesh).material as THREE.MeshPhongMaterial;
+                  material.opacity = progress;
+                }
+              });
+
+              if (progress < 1) {
+                requestAnimationFrame(fadeIn);
+              } else {
+                // Fade complete - disable transparency for better performance
+                ashtray.traverse((child) => {
+                  if ((child as THREE.Mesh).isMesh && (child as THREE.Mesh).material) {
+                    const material = (child as THREE.Mesh).material as THREE.MeshPhongMaterial;
+                    material.transparent = false;
+                    material.opacity = 1;
+                  }
+                });
+              }
+            };
+            
+            fadeIn();
+          }, i * 200); // 200ms delay between each ashtray
         }
 
         setIsLoaded(true);
-
-        // Start entrance animations with delays
-        objects.forEach((ashtray, index) => {
-          setTimeout(() => {
-            animateAshtrayEntrance(ashtray as any, index);
-          }, index * 400); // 400ms delay between each
-        });
-
-      } catch (err) {
-        console.error('Failed to load GLTF model:', err);
-        setError(`Model loading failed: ${err}`);
-      }
-    };
-
-    // Animate ashtray entrance from bottom
-    const animateAshtrayEntrance = (ashtray: any, index: number) => {
-      ashtray.isAnimating = true;
-      
-      const startTime = Date.now();
-      const duration = 1200 + Math.random() * 400; // 1.2-1.6 seconds
-      const startY = -50;
-      const finalY = ashtray.finalPosition.y;
-      const overshoot = finalY + 3; // Slight bounce overshoot
-      
-      const animateUp = () => {
-        if (!ashtray.isAnimating) return;
-        
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        
-        // Easing function for bouncy landing
-        const easeOutBounce = (t: number) => {
-          if (t < 0.7) {
-            // Rising phase - ease out
-            return 1 - Math.pow(1 - (t / 0.7), 3);
-          } else {
-            // Landing phase - small bounce
-            const bounceProgress = (t - 0.7) / 0.3;
-            return 1 + Math.sin(bounceProgress * Math.PI) * 0.1 * (1 - bounceProgress);
-          }
-        };
-        
-        const easedProgress = easeOutBounce(progress);
-        
-        // Animate position
-        ashtray.position.y = startY + (finalY - startY) * easedProgress;
-        
-        // Animate scale
-        ashtray.scale.setScalar(ashtray.finalScale * Math.min(progress * 1.5, 1));
-        
-        if (progress < 1) {
-          requestAnimationFrame(animateUp);
-        } else {
-          // Landing complete
-          ashtray.position.y = finalY;
-          ashtray.scale.setScalar(ashtray.finalScale);
-          ashtray.isAnimating = false;
-          ashtray.hasLanded = true;
-        }
-      };
-      
-      animateUp();
-    };
 
     // Start loading the model
     loadModel();
@@ -259,46 +220,40 @@ const Floating3DObjects: React.FC = () => {
 
     window.addEventListener('mousemove', onMouseMove);
 
-    // Animation loop with entrance animations and space spinning
+    // Animation loop with space spinning
     const animate = () => {
       animationIdRef.current = requestAnimationFrame(animate);
 
-      // Handle both entrance animations and space spinning
+      // Constant spinning animation for all ashtrays
       objects.forEach((object, index) => {
-        const ashtray = object as any;
+        const spinSpeed = (object as any).spinSpeed;
         
-        // Only apply spinning if the ashtray has landed and isn't animating entrance
-        if (ashtray.hasLanded && !ashtray.isAnimating) {
-          const spinSpeed = ashtray.spinSpeed;
+        if (object !== hoveredObject) {
+          // Normal space-like spinning
+          object.rotation.x += spinSpeed.x;
+          object.rotation.y += spinSpeed.y;
+          object.rotation.z += spinSpeed.z;
+        } else {
+          // When hovered, still spin but also follow mouse
+          object.rotation.x += spinSpeed.x * 0.3; // Slower spin when hovered
+          object.rotation.y += spinSpeed.y * 0.3;
+          object.rotation.z += spinSpeed.z * 0.3;
           
-          if (object !== hoveredObject) {
-            // Normal space-like spinning
-            object.rotation.x += spinSpeed.x;
-            object.rotation.y += spinSpeed.y;
-            object.rotation.z += spinSpeed.z;
-          } else {
-            // When hovered, still spin but also follow mouse
-            object.rotation.x += spinSpeed.x * 0.3; // Slower spin when hovered
-            object.rotation.y += spinSpeed.y * 0.3;
-            object.rotation.z += spinSpeed.z * 0.3;
-            
-            // Add mouse-following behavior on top of spinning
-            const mousePosition3D = new THREE.Vector3(mouse.x * 15, mouse.y * 15, 8);
-            const objectPosition = object.position;
-            const direction = new THREE.Vector3().subVectors(mousePosition3D, objectPosition).normalize();
-            
-            const targetRotation = new THREE.Euler();
-            targetRotation.setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(
-              new THREE.Vector3(0, 0, 1),
-              direction
-            ));
-            
-            // Gently influence rotation towards mouse (mixed with spinning)
-            object.rotation.x += (targetRotation.x - object.rotation.x) * 0.02;
-            object.rotation.y += (targetRotation.y - object.rotation.y) * 0.02;
-          }
+          // Add mouse-following behavior on top of spinning
+          const mousePosition3D = new THREE.Vector3(mouse.x * 15, mouse.y * 15, 8);
+          const objectPosition = object.position;
+          const direction = new THREE.Vector3().subVectors(mousePosition3D, objectPosition).normalize();
+          
+          const targetRotation = new THREE.Euler();
+          targetRotation.setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(
+            new THREE.Vector3(0, 0, 1),
+            direction
+          ));
+          
+          // Gently influence rotation towards mouse (mixed with spinning)
+          object.rotation.x += (targetRotation.x - object.rotation.x) * 0.02;
+          object.rotation.y += (targetRotation.y - object.rotation.y) * 0.02;
         }
-        // If animating entrance or not landed yet, the entrance animation handles positioning
       });
       
       renderer.render(scene, camera);
