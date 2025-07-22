@@ -27,10 +27,14 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div 
-            className="text-2xl font-bold text-gray-900 cursor-pointer hover:text-gray-700 transition-colors"
+            className="cursor-pointer hover:opacity-75 transition-opacity"
             onClick={() => onPageChange('home')}
           >
-            MOBOUR
+            <img 
+              src="/logo.png" 
+              alt="MOBOUR" 
+              className="h-8 w-auto"
+            />
           </div>
 
           {/* Burger Menu Button */}
