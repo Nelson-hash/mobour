@@ -39,11 +39,15 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
               className="cursor-pointer hover:opacity-75 transition-opacity"
               onClick={() => onPageChange('home')}
             >
-              <img 
-                src="/logo.svg" 
-                alt="MOBOUR" 
-                className="h-12 w-auto"
-              />
+              <object 
+                data="/logo.svg" 
+                type="image/svg+xml" 
+                className="h-12 w-auto pointer-events-none"
+                style={{ background: 'transparent' }}
+              >
+                {/* Fallback if SVG doesn't load */}
+                <img src="/logo.svg" alt="MOBOUR" className="h-12 w-auto" />
+              </object>
             </div>
           </div>
 
