@@ -9,16 +9,24 @@ const Floating3DObjects: React.FC = () => {
   const animationIdRef = useRef<number>();
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     if (!mountRef.current) return;
+
+    // Detect mobile/tablet
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
 
     // Scene setup
     const scene = new THREE.Scene();
     sceneRef.current = scene;
     
     const camera = new THREE.PerspectiveCamera(
-      75,
+      isMobile ? 85 : 75, // Wider FOV on mobile
       window.innerWidth / window.innerHeight,
       0.1,
       1000
@@ -26,25 +34,29 @@ const Floating3DObjects: React.FC = () => {
     
     const renderer = new THREE.WebGLRenderer({ 
       antialias: true, 
-      alpha: true 
+      alpha: true,
+      powerPreference: "high-performance" // Better performance
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limit pixel ratio for performance
     renderer.setClearColor(0x000000, 0);
-    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.enabled = !isMobile; // Disable shadows on mobile for performance
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
     
     mountRef.current.appendChild(renderer.domElement);
 
-    // Lighting setup optimized for white objects on concrete
-    const ambientLight = new THREE.AmbientLight(0xf0f0f0, 0.7);
+    // Responsive lighting setup
+    const ambientLight = new THREE.AmbientLight(0xf0f0f0, isMobile ? 0.8 : 0.7);
     scene.add(ambientLight);
     
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, isMobile ? 1.0 : 1.2);
     directionalLight.position.set(15, 15, 10);
-    directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
+    if (!isMobile) {
+      directionalLight.castShadow = true;
+      directionalLight.shadow.mapSize.width = 1024; // Reduced for better performance
+      directionalLight.shadow.mapSize.height = 1024;
+    }
     scene.add(directionalLight);
 
     const fillLight = new THREE.DirectionalLight(0xe8e8e8, 0.4);
@@ -55,7 +67,15 @@ const Floating3DObjects: React.FC = () => {
     accentLight.position.set(0, 10, 0);
     scene.add(accentLight);
 
-    camera.position.z = 30;
+    // Responsive camera positioning
+    const getCameraDistance = () => {
+      if (window.innerWidth < 480) return 45; // Phone
+      if (window.innerWidth < 768) return 40; // Small tablet
+      if (window.innerWidth < 1024) return 35; // Tablet
+      return 30; // Desktop
+    };
+
+    camera.position.z = getCameraDistance();
 
     // Load GLTF model
     const loader = new GLTFLoader();
@@ -84,16 +104,21 @@ const Floating3DObjects: React.FC = () => {
 
         const originalModel = gltf.scene;
         
-        // Create exactly 7 white ashtrays in specific positions and orientations
-        const positions = [
-          { x: -32, y: 15, z: -8, rotX: 0.1, rotY: 0.3, rotZ: 0.2 },
-          { x: 30, y: 16, z: -6, rotX: -0.2, rotY: -0.4, rotZ: 0.1 },
-          { x: -20, y: 8, z: -12, rotX: 0.2, rotY: 0.5, rotZ: 0 },
-          { x: 18, y: 6, z: -10, rotX: 0, rotY: -0.8, rotZ: 0.1 },
-          { x: -3, y: -2, z: 5, rotX: 0.3, rotY: 1.2, rotZ: -0.1 },
-          { x: -22, y: -12, z: 8, rotX: -0.1, rotY: 0.3, rotZ: 0.2 },
-          { x: 20, y: -8, z: 12, rotX: 0.1, rotY: -0.6, rotZ: -0.2 }
-        ];
+        // Responsive positioning - closer together on mobile
+        const getResponsivePositions = () => {
+          const scale = window.innerWidth < 768 ? 0.7 : 1; // Closer on mobile
+          return [
+            { x: -32 * scale, y: 15 * scale, z: -8 * scale, rotX: 0.1, rotY: 0.3, rotZ: 0.2 },
+            { x: 30 * scale, y: 16 * scale, z: -6 * scale, rotX: -0.2, rotY: -0.4, rotZ: 0.1 },
+            { x: -20 * scale, y: 8 * scale, z: -12 * scale, rotX: 0.2, rotY: 0.5, rotZ: 0 },
+            { x: 18 * scale, y: 6 * scale, z: -10 * scale, rotX: 0, rotY: -0.8, rotZ: 0.1 },
+            { x: -3 * scale, y: -2 * scale, z: 5 * scale, rotX: 0.3, rotY: 1.2, rotZ: -0.1 },
+            { x: -22 * scale, y: -12 * scale, z: 8 * scale, rotX: -0.1, rotY: 0.3, rotZ: 0.2 },
+            { x: 20 * scale, y: -8 * scale, z: 12 * scale, rotX: 0.1, rotY: -0.6, rotZ: -0.2 }
+          ];
+        };
+
+        const positions = getResponsivePositions();
 
         // Create all ashtrays with simple fade-in
         for (let i = 0; i < 7; i++) {
@@ -104,11 +129,16 @@ const Floating3DObjects: React.FC = () => {
           ashtray.position.set(pos.x, pos.y, pos.z);
           ashtray.rotation.set(pos.rotX, pos.rotY, pos.rotZ);
           
-          const baseScale = 4.0;
-          const scale = baseScale + (i * 0.1);
+          // Responsive scaling - smaller on mobile
+          const getResponsiveScale = (index: number) => {
+            const baseScale = window.innerWidth < 768 ? 3.0 : 4.0; // Smaller on mobile
+            return baseScale + (index * 0.08);
+          };
+
+          const scale = getResponsiveScale(i);
           ashtray.scale.setScalar(scale);
 
-          // Apply ceramic material
+          // Apply ceramic material with performance optimization
           const ceramicMaterial = new THREE.MeshPhongMaterial({ 
             color: 0xf8f8f8,
             shininess: 15,
@@ -121,8 +151,10 @@ const Floating3DObjects: React.FC = () => {
             if ((child as THREE.Mesh).isMesh) {
               const mesh = child as THREE.Mesh;
               mesh.material = ceramicMaterial;
-              mesh.castShadow = true;
-              mesh.receiveShadow = true;
+              if (!isMobile) {
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+              }
             }
           });
           
@@ -133,28 +165,33 @@ const Floating3DObjects: React.FC = () => {
             z: ashtray.rotation.z
           };
 
+          // Responsive spin speeds - slower on mobile for better performance
           (ashtray as any).spinSpeed = {
-            x: (Math.random() - 0.5) * 0.02,
-            y: (Math.random() - 0.5) * 0.03,
-            z: (Math.random() - 0.5) * 0.025
+            x: (Math.random() - 0.5) * (isMobile ? 0.015 : 0.02),
+            y: (Math.random() - 0.5) * (isMobile ? 0.02 : 0.03),
+            z: (Math.random() - 0.5) * (isMobile ? 0.018 : 0.025)
           };
 
           scene.add(ashtray);
           objects.push(ashtray);
 
-          // Simple fade-in with delay
+          // Responsive fade-in timing - faster on mobile
           setTimeout(() => {
             const startTime = Date.now();
-            const fadeDuration = 800;
+            const fadeDuration = isMobile ? 600 : 800; // Faster on mobile
 
             const fadeIn = () => {
               const elapsed = Date.now() - startTime;
               const progress = Math.min(elapsed / fadeDuration, 1);
               
+              // Smooth easing function
+              const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+              const easedProgress = easeOutCubic(progress);
+              
               ashtray.traverse((child) => {
                 if ((child as THREE.Mesh).isMesh && (child as THREE.Mesh).material) {
                   const material = (child as THREE.Mesh).material as THREE.MeshPhongMaterial;
-                  material.opacity = progress;
+                  material.opacity = easedProgress;
                 }
               });
 
@@ -172,7 +209,7 @@ const Floating3DObjects: React.FC = () => {
             };
             
             fadeIn();
-          }, i * 200);
+          }, i * (isMobile ? 150 : 200)); // Faster stagger on mobile
         }
 
         setIsLoaded(true);
@@ -186,39 +223,76 @@ const Floating3DObjects: React.FC = () => {
     // Start loading the model
     loadModel();
 
-    // Mouse interaction
+    // Responsive mouse/touch interaction
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
+    let isTouch = false;
 
-    const onMouseMove = (event: MouseEvent) => {
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(objects, true);
-
-      if (hoveredObject) {
-        hoveredObject = null;
+    const onPointerMove = (event: MouseEvent | TouchEvent) => {
+      let clientX, clientY;
+      
+      if ('touches' in event && event.touches.length > 0) {
+        clientX = event.touches[0].clientX;
+        clientY = event.touches[0].clientY;
+        isTouch = true;
+      } else if ('clientX' in event) {
+        clientX = event.clientX;
+        clientY = event.clientY;
+        isTouch = false;
+      } else {
+        return;
       }
 
-      if (intersects.length > 0) {
-        let newHovered = intersects[0].object;
-        
-        while (newHovered.parent && newHovered.parent !== scene) {
-          newHovered = newHovered.parent;
+      mouse.x = (clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+
+      // Only do raycast interaction on desktop or when touch is active
+      if (!isMobile || isTouch) {
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(objects, true);
+
+        if (hoveredObject) {
+          hoveredObject = null;
         }
 
-        if (objects.includes(newHovered)) {
-          hoveredObject = newHovered;
+        if (intersects.length > 0) {
+          let newHovered = intersects[0].object;
+          
+          while (newHovered.parent && newHovered.parent !== scene) {
+            newHovered = newHovered.parent;
+          }
+
+          if (objects.includes(newHovered)) {
+            hoveredObject = newHovered;
+          }
         }
       }
     };
 
-    window.addEventListener('mousemove', onMouseMove);
+    // Add both mouse and touch event listeners
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('touchmove', onPointerMove, { passive: true });
+    
+    // Reset hover on touch end
+    const onTouchEnd = () => {
+      hoveredObject = null;
+      isTouch = false;
+    };
+    window.addEventListener('touchend', onTouchEnd);
 
-    // Animation loop with space spinning
-    const animate = () => {
+    // Smooth responsive animation loop
+    let lastTime = 0;
+    const targetFPS = isMobile ? 30 : 60; // Lower FPS on mobile for better performance
+    const interval = 1000 / targetFPS;
+
+    const animate = (currentTime: number) => {
       animationIdRef.current = requestAnimationFrame(animate);
+
+      // Throttle frame rate on mobile
+      if (currentTime - lastTime < interval && isMobile) {
+        return;
+      }
+      lastTime = currentTime;
 
       objects.forEach((object, index) => {
         const spinSpeed = (object as any).spinSpeed;
@@ -228,11 +302,15 @@ const Floating3DObjects: React.FC = () => {
           object.rotation.y += spinSpeed.y;
           object.rotation.z += spinSpeed.z;
         } else {
-          object.rotation.x += spinSpeed.x * 0.3;
-          object.rotation.y += spinSpeed.y * 0.3;
-          object.rotation.z += spinSpeed.z * 0.3;
+          // Smoother hover interaction
+          const hoverDamping = isMobile ? 0.2 : 0.3;
+          object.rotation.x += spinSpeed.x * hoverDamping;
+          object.rotation.y += spinSpeed.y * hoverDamping;
+          object.rotation.z += spinSpeed.z * hoverDamping;
           
-          const mousePosition3D = new THREE.Vector3(mouse.x * 15, mouse.y * 15, 8);
+          // Responsive mouse following sensitivity
+          const mouseSensitivity = isMobile ? 10 : 15;
+          const mousePosition3D = new THREE.Vector3(mouse.x * mouseSensitivity, mouse.y * mouseSensitivity, 8);
           const objectPosition = object.position;
           const direction = new THREE.Vector3().subVectors(mousePosition3D, objectPosition).normalize();
           
@@ -242,32 +320,61 @@ const Floating3DObjects: React.FC = () => {
             direction
           ));
           
-          object.rotation.x += (targetRotation.x - object.rotation.x) * 0.02;
-          object.rotation.y += (targetRotation.y - object.rotation.y) * 0.02;
+          // Smoother rotation interpolation
+          const rotationSpeed = isMobile ? 0.015 : 0.02;
+          object.rotation.x += (targetRotation.x - object.rotation.x) * rotationSpeed;
+          object.rotation.y += (targetRotation.y - object.rotation.y) * rotationSpeed;
         }
       });
       
       renderer.render(scene, camera);
     };
 
-    animate();
+    animate(0);
 
-    // Handle resize
+    // Smooth responsive resize handling
     const handleResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      
+      camera.aspect = width / height;
+      camera.fov = width < 768 ? 85 : 75; // Adjust FOV based on screen size
+      camera.position.z = getCameraDistance(); // Update camera distance
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      
+      // Update mobile state
+      const newIsMobile = width < 768;
+      if (newIsMobile !== isMobile) {
+        setIsMobile(newIsMobile);
+      }
     };
 
-    window.addEventListener('resize', handleResize);
+    // Throttled resize for better performance
+    let resizeTimeout: NodeJS.Timeout;
+    const throttledResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(handleResize, 100);
+    };
+
+    window.addEventListener('resize', throttledResize);
 
     // Cleanup
     return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('resize', throttledResize);
+      window.removeEventListener('resize', checkMobile);
+      window.removeEventListener('mousemove', onPointerMove);
+      window.removeEventListener('touchmove', onPointerMove);
+      window.removeEventListener('touchend', onTouchEnd);
       
       if (animationIdRef.current) {
         cancelAnimationFrame(animationIdRef.current);
+      }
+      
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
       }
       
       if (mountRef.current && renderer.domElement) {
