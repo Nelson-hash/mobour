@@ -58,7 +58,7 @@ const Floating3DObjects: React.FC = () => {
     accentLight.position.set(0, 10, 0);
     scene.add(accentLight);
 
-    camera.position.z = 15;
+    camera.position.z = 25; // Moved camera further back to see all larger ashtrays
 
     // Load GLTF model
     const loader = new GLTFLoader();
@@ -92,27 +92,28 @@ const Floating3DObjects: React.FC = () => {
         const originalModel = gltf.scene;
         console.log('Original model:', originalModel);
         
-        // Create exactly 5 white ashtrays in specific positions and orientations
+        // Create exactly 5 white ashtrays in specific positions and orientations (much larger and further apart)
         const positions = [
-          { x: -8, y: 2, z: -3, rotX: 0.2, rotY: 0.5, rotZ: 0 },      // Top left
-          { x: 6, y: 1, z: -2, rotX: 0, rotY: -0.8, rotZ: 0.1 },      // Top right  
-          { x: -2, y: -1, z: 2, rotX: 0.3, rotY: 1.2, rotZ: -0.1 },   // Center
-          { x: -9, y: -3, z: 1, rotX: -0.1, rotY: 0.3, rotZ: 0.2 },   // Bottom left
-          { x: 7, y: -2, z: 3, rotX: 0.1, rotY: -0.6, rotZ: -0.2 }    // Bottom right
+          { x: -20, y: 8, z: -12, rotX: 0.2, rotY: 0.5, rotZ: 0 },      // Top left
+          { x: 18, y: 6, z: -10, rotX: 0, rotY: -0.8, rotZ: 0.1 },      // Top right  
+          { x: -3, y: -2, z: 5, rotX: 0.3, rotY: 1.2, rotZ: -0.1 },     // Center
+          { x: -22, y: -12, z: 8, rotX: -0.1, rotY: 0.3, rotZ: 0.2 },   // Bottom left
+          { x: 20, y: -8, z: 12, rotX: 0.1, rotY: -0.6, rotZ: -0.2 }    // Bottom right
         ];
 
         for (let i = 0; i < 5; i++) {
           const ashtray = originalModel.clone();
           const pos = positions[i];
           
-          // Set specific positions
+          // Set specific positions (much further apart)
           ashtray.position.set(pos.x, pos.y, pos.z);
           
           // Set specific orientations for variety
           ashtray.rotation.set(pos.rotX, pos.rotY, pos.rotZ);
           
-          // Slightly varied scales for natural look
-          const scale = 0.8 + (i * 0.1); // Scales from 0.8 to 1.2
+          // 5 times bigger scales with slight variation
+          const baseScale = 4.0; // 5x bigger than before (was 0.8)
+          const scale = baseScale + (i * 0.2); // Scales from 4.0 to 4.8 (5x bigger)
           ashtray.scale.setScalar(scale);
 
           // Apply ceramic-like white material
