@@ -8,7 +8,7 @@ const Floating3DObjects: React.FC = () => {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const animationIdRef = useRef<number>();
   const [isLoaded, setIsLoaded] = useState(false);
-  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadedCount, setLoadedCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -69,7 +69,7 @@ const Floating3DObjects: React.FC = () => {
       try {
         console.log('Loading ashtray model...');
         
-        // Load the ashtray model
+        // Load the ashtray model once
         const gltf = await new Promise<any>((resolve, reject) => {
           loader.load(
             '/models/ashtray.glb',
@@ -78,9 +78,7 @@ const Floating3DObjects: React.FC = () => {
               resolve(gltf);
             },
             (progress) => {
-              const percentComplete = progress.total ? (progress.loaded / progress.total) * 100 : 0;
-              setLoadingProgress(percentComplete);
-              console.log('Loading progress:', percentComplete + '%');
+              // We don't need to show loading progress anymore
             },
             (error) => {
               console.error('Error loading model:', error);
@@ -103,7 +101,13 @@ const Floating3DObjects: React.FC = () => {
           { x: 20, y: -8, z: 12, rotX: 0.1, rotY: -0.6, rotZ: -0.2 }    // Bottom right
         ];
 
+        // Create ashtrays progressively with delays
         for (let i = 0; i < 7; i++) {
+          // Add delay between each ashtray creation
+          if (i > 0) {
+            await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300)); // Random delay 200-500ms
+          }
+
           const ashtray = originalModel.clone();
           const pos = positions[i];
           
@@ -150,9 +154,28 @@ const Floating3DObjects: React.FC = () => {
             y: (Math.random() - 0.5) * 0.03, // Random Y rotation speed  
             z: (Math.random() - 0.5) * 0.025  // Random Z rotation speed
           };
+
+          // Start with scale 0 for smooth appearance animation
+          ashtray.scale.setScalar(0);
           
           scene.add(ashtray);
           objects.push(ashtray);
+          
+          // Animate the ashtray appearing
+          const targetScale = scale;
+          const animateAppearance = () => {
+            const currentScale = ashtray.scale.x;
+            if (currentScale < targetScale) {
+              const newScale = currentScale + (targetScale * 0.08); // Smooth scale-up
+              ashtray.scale.setScalar(Math.min(newScale, targetScale));
+              requestAnimationFrame(animateAppearance);
+            }
+          };
+          animateAppearance();
+          
+          // Update loaded count for UI
+          setLoadedCount(i + 1);
+          console.log(`Ashtray ${i + 1}/7 added and appearing...`);
         }
 
         console.log('7 spinning ceramic ashtrays added to scene');
@@ -297,14 +320,21 @@ const Floating3DObjects: React.FC = () => {
           zIndex: 1
         }}
       />
-      {!isLoaded && !error && (
+      {loadedCount > 0 && loadedCount < 7 && (
+        <div className="absolute bottom-8 right-8 z-10">
+          <div className="bg-white bg-opacity-20 backdrop-blur-sm px-4 py-2 rounded-lg">
+            <div className="flex items-center space-x-2 text-gray-700">
+              <div className="w-2 h-2 bg-gray-600 rounded-full animate-pulse"></div>
+              <span className="text-sm font-medium">{loadedCount}/7</span>
+            </div>
+          </div>
+        </div>
+      )}
+      {!isLoaded && !error && loadedCount === 0 && (
         <div className="absolute inset-0 flex items-center justify-center z-10">
           <div className="text-center">
-            <div className="w-12 h-12 border-3 border-gray-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-lg text-gray-700 font-medium">Loading ashtrays...</p>
-            {loadingProgress > 0 && (
-              <p className="text-sm text-gray-500">{Math.round(loadingProgress)}%</p>
-            )}
+            <div className="w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mb-2"></div>
+            <p className="text-sm text-gray-600">Preparing scene...</p>
           </div>
         </div>
       )}
