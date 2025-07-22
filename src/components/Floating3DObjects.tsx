@@ -110,8 +110,6 @@ const Floating3DObjects: React.FC = () => {
           return [
             { x: -32 * scale, y: 15 * scale, z: -8 * scale, rotX: 0.1, rotY: 0.3, rotZ: 0.2 },
             { x: 30 * scale, y: 16 * scale, z: -6 * scale, rotX: -0.2, rotY: -0.4, rotZ: 0.1 },
-            { x: -20 * scale, y: 8 * scale, z: -12 * scale, rotX: 0.2, rotY: 0.5, rotZ: 0 },
-            { x: 18 * scale, y: 6 * scale, z: -10 * scale, rotX: 0, rotY: -0.8, rotZ: 0.1 },
             { x: -3 * scale, y: -2 * scale, z: 5 * scale, rotX: 0.3, rotY: 1.2, rotZ: -0.1 },
             { x: -22 * scale, y: -6 * scale, z: 8 * scale, rotX: -0.1, rotY: 0.3, rotZ: 0.2 }, // Moved from -12 to -6 (higher)
             { x: 20 * scale, y: -8 * scale, z: 12 * scale, rotX: 0.1, rotY: -0.6, rotZ: -0.2 }
