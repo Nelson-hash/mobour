@@ -8,7 +8,6 @@ interface ProductCardProps {
 
 const ProductCard: React.FC<ProductCardProps> = memo(({ product, onViewProduct }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
 
   const handleImageHover = useCallback(() => {
@@ -25,46 +24,35 @@ const ProductCard: React.FC<ProductCardProps> = memo(({ product, onViewProduct }
     onViewProduct(product);
   }, [product, onViewProduct]);
 
-  const handleImageLoad = useCallback(() => {
-    setImageLoaded(true);
-  }, []);
-
   const handleImageError = useCallback(() => {
+    console.log('Image error for:', product.images[currentImageIndex]);
     setImageError(true);
-    setImageLoaded(true);
-  }, []);
+  }, [product.images, currentImageIndex]);
 
   return (
     <div 
       className="group bg-white cursor-pointer"
       onClick={handleClick}
     >
-      {/* Image Container with loading state */}
+      {/* Image Container - Simplified */}
       <div className="relative aspect-square overflow-hidden bg-gray-100 mb-4">
-        {!imageLoaded && (
-          <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
-        )}
-        
         {imageError ? (
           <div className="w-full h-full flex items-center justify-center bg-gray-100">
             <div className="text-gray-400 text-center">
               <div className="w-16 h-16 bg-gray-300 rounded mx-auto mb-2"></div>
               <p className="text-xs">Image non disponible</p>
+              <p className="text-xs text-gray-300 mt-1">{product.images[0]}</p>
             </div>
           </div>
         ) : (
           <img
             src={product.images[currentImageIndex]}
             alt={product.name}
-            className={`w-full h-full object-cover transition-all duration-300 ${
-              imageLoaded ? 'opacity-100' : 'opacity-0'
-            }`}
+            className="w-full h-full object-cover transition-all duration-300 hover:scale-105"
             onMouseEnter={handleImageHover}
             onMouseLeave={handleImageLeave}
-            onLoad={handleImageLoad}
             onError={handleImageError}
-            loading="lazy"
-            decoding="async"
+            style={{ minHeight: '200px' }}
           />
         )}
       </div>
@@ -75,7 +63,7 @@ const ProductCard: React.FC<ProductCardProps> = memo(({ product, onViewProduct }
           {product.category}
         </div>
         
-        <h3 className="text-base font-medium text-gray-900 line-clamp-2">
+        <h3 className="text-base font-medium text-gray-900">
           {product.name}
         </h3>
         
