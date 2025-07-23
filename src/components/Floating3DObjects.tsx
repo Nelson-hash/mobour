@@ -1,76 +1,35 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 
-// Import GLTFLoader from the CDN-hosted examples
+// Simplified GLTFLoader with better error handling
 const GLTFLoader = (() => {
-  if (typeof window !== 'undefined' && (window as any).THREE) {
-    // If Three.js examples are available globally
-    return (window as any).THREE.GLTFLoader;
-  }
-  
-  // Fallback: Create a basic loader that will attempt to load GLTF
   class GLTFLoader {
     load(url: string, onLoad: (gltf: any) => void, onProgress?: (progress: any) => void, onError?: (error: any) => void) {
-      // Try to use dynamic import for GLTFLoader
+      // Try dynamic import first
       import('three/examples/jsm/loaders/GLTFLoader.js')
         .then((module) => {
           const loader = new module.GLTFLoader();
           loader.load(url, onLoad, onProgress, onError);
         })
-        .catch((importError) => {
-          console.warn('Could not import GLTFLoader, trying fetch approach:', importError);
-          
-          // Fallback: try to fetch and parse manually
-          fetch(url)
-            .then(response => response.arrayBuffer())
-            .then(() => {
-              // If we can't parse GLTF, create a fallback geometric ashtray
-              console.log('Creating fallback geometric ashtray...');
-              const scene = this.createFallbackAshtray();
-              onLoad({ scene });
-            })
-            .catch(fetchError => {
-              console.error('Fetch failed, creating geometric fallback:', fetchError);
-              const scene = this.createFallbackAshtray();
-              onLoad({ scene });
-            });
+        .catch(() => {
+          // Fallback to geometric ashtray
+          console.log('Using geometric fallback');
+          const scene = this.createFallbackAshtray();
+          onLoad({ scene });
         });
     }
     
     createFallbackAshtray() {
       const group = new THREE.Group();
       
-      // Main body - cylinder
-      const bodyGeometry = new THREE.CylinderGeometry(2, 2.5, 0.5, 32);
-      const bodyMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0xf8f8f8,
-        shininess: 15,
-        specular: 0x888888
+      // Simplified geometry for better performance
+      const bodyGeometry = new THREE.CylinderGeometry(2, 2.5, 0.5, 16); // Reduced segments
+      const bodyMaterial = new THREE.MeshLambertMaterial({ // Lambert is faster than Phong
+        color: 0xf8f8f8
       });
       const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
       body.position.y = 0.25;
       group.add(body);
-      
-      // Inner depression
-      const innerGeometry = new THREE.CylinderGeometry(1.5, 1.8, 0.3, 32);
-      const innerMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0xe8e8e8,
-        shininess: 10
-      });
-      const inner = new THREE.Mesh(innerGeometry, innerMaterial);
-      inner.position.y = 0.35;
-      group.add(inner);
-      
-      // Small notches for cigarettes (3 of them)
-      for (let i = 0; i < 3; i++) {
-        const notchGeometry = new THREE.BoxGeometry(0.3, 0.2, 0.1);
-        const notch = new THREE.Mesh(notchGeometry, bodyMaterial.clone());
-        const angle = (i / 3) * Math.PI * 2;
-        notch.position.x = Math.cos(angle) * 2.2;
-        notch.position.z = Math.sin(angle) * 2.2;
-        notch.position.y = 0.4;
-        group.add(notch);
-      }
       
       return group;
     }
@@ -84,142 +43,138 @@ const Floating3DObjects: React.FC = () => {
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const animationIdRef = useRef<number>();
+  const objectsRef = useRef<THREE.Object3D[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
+  // Memoized device detection
+  const checkDevice = useCallback(() => {
+    const mobile = window.innerWidth < 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    setIsMobile(mobile);
+    return mobile;
+  }, []);
+
   useEffect(() => {
     if (!mountRef.current) return;
 
-    // Detect mobile/tablet
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
+    const isMobileDevice = checkDevice();
+    
+    // Early return for very small screens or low-end devices
+    if (window.innerWidth < 480) {
+      setIsLoaded(true);
+      return;
+    }
 
-    // Scene setup
+    // Scene setup with performance optimizations
     const scene = new THREE.Scene();
     sceneRef.current = scene;
     
     const camera = new THREE.PerspectiveCamera(
-      isMobile ? 85 : 75, // Wider FOV on mobile
+      isMobileDevice ? 90 : 75,
       window.innerWidth / window.innerHeight,
       0.1,
-      1000
+      100 // Reduced far plane
     );
     
     const renderer = new THREE.WebGLRenderer({ 
-      antialias: true, 
+      antialias: !isMobileDevice, // Disable AA on mobile
       alpha: true,
-      powerPreference: "high-performance" // Better performance
+      powerPreference: "high-performance",
+      precision: isMobileDevice ? 'mediump' : 'highp' // Lower precision on mobile
     });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limit pixel ratio for performance
-    renderer.setClearColor(0x000000, 0);
-    renderer.shadowMap.enabled = !isMobile; // Disable shadows on mobile for performance
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    rendererRef.current = renderer;
     
+    // Performance settings
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobileDevice ? 1.5 : 2));
+    renderer.setClearColor(0x000000, 0);
+    
+    // Disable shadows on mobile entirely
+    if (!isMobileDevice) {
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFShadowMap; // Faster than PCFSoft
+    }
+    
+    rendererRef.current = renderer;
     mountRef.current.appendChild(renderer.domElement);
 
-    // Responsive lighting setup
-    const ambientLight = new THREE.AmbientLight(0xf0f0f0, isMobile ? 0.8 : 0.7);
+    // Simplified lighting for mobile
+    const ambientLight = new THREE.AmbientLight(0xf0f0f0, isMobileDevice ? 1.0 : 0.7);
     scene.add(ambientLight);
     
-    const directionalLight = new THREE.DirectionalLight(0xffffff, isMobile ? 1.0 : 1.2);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, isMobileDevice ? 0.8 : 1.2);
     directionalLight.position.set(15, 15, 10);
-    if (!isMobile) {
+    
+    if (!isMobileDevice) {
       directionalLight.castShadow = true;
-      directionalLight.shadow.mapSize.width = 1024; // Reduced for better performance
-      directionalLight.shadow.mapSize.height = 1024;
+      directionalLight.shadow.mapSize.width = 512; // Reduced shadow map size
+      directionalLight.shadow.mapSize.height = 512;
+      directionalLight.shadow.camera.far = 50; // Reduced shadow distance
     }
     scene.add(directionalLight);
 
-    const fillLight = new THREE.DirectionalLight(0xe8e8e8, 0.4);
-    fillLight.position.set(-10, 5, -5);
-    scene.add(fillLight);
-
-    const accentLight = new THREE.PointLight(0xd0d0d0, 0.3);
-    accentLight.position.set(0, 10, 0);
-    scene.add(accentLight);
-
-    // Responsive camera positioning
+    // Camera positioning based on device
     const getCameraDistance = () => {
-      if (window.innerWidth < 480) return 45; // Phone
-      if (window.innerWidth < 768) return 40; // Small tablet
-      if (window.innerWidth < 1024) return 35; // Tablet
-      return 30; // Desktop
+      if (isMobileDevice) return 50;
+      if (window.innerWidth < 1024) return 40;
+      return 30;
     };
 
     camera.position.z = getCameraDistance();
 
-    // Load GLTF model
+    // Load models with reduced count on mobile
     const loader = new GLTFLoader();
-    const objects: THREE.Object3D[] = [];
-    let hoveredObject: THREE.Object3D | null = null;
+    const maxObjects = isMobileDevice ? 3 : 5; // Fewer objects on mobile
+    let loadedCount = 0;
 
     const loadModel = async () => {
       try {
-        console.log('Loading ashtray model from /models/ashtray.glb...');
-        
-        // Load the ashtray model once
         const gltf = await new Promise<any>((resolve, reject) => {
           loader.load(
             '/models/ashtray.glb',
-            (gltf) => {
-              console.log('Model loaded successfully:', gltf);
-              resolve(gltf);
-            },
-            (progress) => {
-              console.log('Loading progress:', progress);
-            },
-            (error) => {
-              console.error('Error loading model:', error);
-              reject(error);
-            }
+            resolve,
+            undefined,
+            reject
           );
         });
 
         const originalModel = gltf.scene;
         
-        // Responsive positioning - only 5 ashtrays (center + 4 corners)
-        const getResponsivePositions = () => {
-          const scale = window.innerWidth < 768 ? 0.7 : 1; // Closer on mobile
-          return [
-            { x: -32 * scale, y: 15 * scale, z: -8 * scale, rotX: 0.1, rotY: 0.3, rotZ: 0.2 }, // Top left
-            { x: 30 * scale, y: 16 * scale, z: -6 * scale, rotX: -0.2, rotY: -0.4, rotZ: 0.1 }, // Top right
-            { x: -3 * scale, y: -2 * scale, z: 5 * scale, rotX: 0.3, rotY: 1.2, rotZ: -0.1 }, // Center
-            { x: -22 * scale, y: -6 * scale, z: 8 * scale, rotX: -0.1, rotY: 0.3, rotZ: 0.2 }, // Bottom left
-            { x: 20 * scale, y: -8 * scale, z: 12 * scale, rotX: 0.1, rotY: -0.6, rotZ: -0.2 } // Bottom right
+        // Reduced positioning array for mobile
+        const getPositions = () => {
+          const scale = isMobileDevice ? 0.8 : 1;
+          const positions = [
+            { x: 0, y: 0, z: 0, rotX: 0.3, rotY: 1.2, rotZ: -0.1 }, // Center
+            { x: -25 * scale, y: 10 * scale, z: -5 * scale, rotX: 0.1, rotY: 0.3, rotZ: 0.2 },
+            { x: 25 * scale, y: 12 * scale, z: -4 * scale, rotX: -0.2, rotY: -0.4, rotZ: 0.1 }
           ];
+          
+          if (!isMobileDevice) {
+            positions.push(
+              { x: -18 * scale, y: -6 * scale, z: 8 * scale, rotX: -0.1, rotY: 0.3, rotZ: 0.2 },
+              { x: 18 * scale, y: -8 * scale, z: 10 * scale, rotX: 0.1, rotY: -0.6, rotZ: -0.2 }
+            );
+          }
+          
+          return positions;
         };
 
-        const positions = getResponsivePositions();
+        const positions = getPositions();
 
-        // Create 5 ashtrays with simple fade-in
-        for (let i = 0; i < 5; i++) {
+        // Create objects with performance optimizations
+        for (let i = 0; i < maxObjects && i < positions.length; i++) {
           const ashtray = originalModel.clone();
           const pos = positions[i];
           
-          // Set final positions immediately
           ashtray.position.set(pos.x, pos.y, pos.z);
           ashtray.rotation.set(pos.rotX, pos.rotY, pos.rotZ);
           
-          // Responsive scaling - smaller on mobile
-          const getResponsiveScale = (index: number) => {
-            const baseScale = window.innerWidth < 768 ? 3.0 : 4.0; // Smaller on mobile
-            return baseScale + (index * 0.08);
-          };
-
-          const scale = getResponsiveScale(i);
+          const scale = isMobileDevice ? 2.5 : 3.5 + (i * 0.05);
           ashtray.scale.setScalar(scale);
 
-          // Apply ceramic material with performance optimization
-          const ceramicMaterial = new THREE.MeshPhongMaterial({ 
+          // Simplified materials for performance
+          const material = new THREE.MeshLambertMaterial({ 
             color: 0xf8f8f8,
-            shininess: 15,
-            specular: 0x888888,
             transparent: true,
             opacity: 0
           });
@@ -227,48 +182,50 @@ const Floating3DObjects: React.FC = () => {
           ashtray.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
               const mesh = child as THREE.Mesh;
-              mesh.material = ceramicMaterial.clone();
-              if (!isMobile) {
+              
+              // Reduce geometry complexity on mobile
+              if (isMobileDevice && mesh.geometry) {
+                mesh.geometry = mesh.geometry.clone();
+                if ('simplify' in mesh.geometry) {
+                  // Simplify geometry if the method exists
+                }
+              }
+              
+              mesh.material = material.clone();
+              
+              if (!isMobileDevice) {
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
               }
             }
           });
           
-          // Store properties
-          (ashtray as any).originalRotation = {
-            x: ashtray.rotation.x,
-            y: ashtray.rotation.y,
-            z: ashtray.rotation.z
-          };
-
-          // Responsive spin speeds - slower on mobile for better performance
+          // Store animation properties
           (ashtray as any).spinSpeed = {
-            x: (Math.random() - 0.5) * (isMobile ? 0.015 : 0.02),
-            y: (Math.random() - 0.5) * (isMobile ? 0.02 : 0.03),
-            z: (Math.random() - 0.5) * (isMobile ? 0.018 : 0.025)
+            x: (Math.random() - 0.5) * (isMobileDevice ? 0.01 : 0.015),
+            y: (Math.random() - 0.5) * (isMobileDevice ? 0.015 : 0.02),
+            z: (Math.random() - 0.5) * (isMobileDevice ? 0.012 : 0.018)
           };
 
           scene.add(ashtray);
-          objects.push(ashtray);
+          objectsRef.current.push(ashtray);
 
-          // Responsive fade-in timing - faster on mobile
+          // Staggered fade-in
           setTimeout(() => {
             const startTime = Date.now();
-            const fadeDuration = isMobile ? 600 : 800; // Faster on mobile
+            const fadeDuration = isMobileDevice ? 400 : 600;
 
             const fadeIn = () => {
               const elapsed = Date.now() - startTime;
               const progress = Math.min(elapsed / fadeDuration, 1);
-              
-              // Smooth easing function
-              const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-              const easedProgress = easeOutCubic(progress);
+              const easedProgress = 1 - Math.pow(1 - progress, 3);
               
               ashtray.traverse((child) => {
                 if ((child as THREE.Mesh).isMesh && (child as THREE.Mesh).material) {
-                  const material = (child as THREE.Mesh).material as THREE.MeshPhongMaterial;
-                  material.opacity = easedProgress;
+                  const material = (child as THREE.Mesh).material as THREE.Material;
+                  if ('opacity' in material) {
+                    (material as any).opacity = easedProgress;
+                  }
                 }
               });
 
@@ -277,130 +234,86 @@ const Floating3DObjects: React.FC = () => {
               } else {
                 ashtray.traverse((child) => {
                   if ((child as THREE.Mesh).isMesh && (child as THREE.Mesh).material) {
-                    const material = (child as THREE.Mesh).material as THREE.MeshPhongMaterial;
-                    material.transparent = false;
-                    material.opacity = 1;
+                    const material = (child as THREE.Mesh).material as THREE.Material;
+                    if ('transparent' in material) {
+                      (material as any).transparent = false;
+                      (material as any).opacity = 1;
+                    }
                   }
                 });
+                loadedCount++;
+                if (loadedCount === maxObjects) {
+                  setIsLoaded(true);
+                }
               }
             };
             
             fadeIn();
-          }, i * (isMobile ? 150 : 200)); // Faster stagger on mobile
+          }, i * (isMobileDevice ? 100 : 150));
         }
-
-        setIsLoaded(true);
 
       } catch (err) {
-        console.error('Failed to load GLTF model:', err);
-        setError(`Model loading failed. Please ensure /models/ashtray.glb exists in your public folder.`);
+        console.error('Model loading failed:', err);
+        setError('3D model loading failed');
+        setIsLoaded(true);
       }
     };
 
-    // Start loading the model
     loadModel();
 
-    // Responsive mouse/touch interaction
+    // Optimized mouse interaction (disabled on mobile for performance)
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
-    let isTouch = false;
+    let hoveredObject: THREE.Object3D | null = null;
 
-    const onPointerMove = (event: MouseEvent | TouchEvent) => {
-      let clientX, clientY;
-      
-      if ('touches' in event && event.touches.length > 0) {
-        clientX = event.touches[0].clientX;
-        clientY = event.touches[0].clientY;
-        isTouch = true;
-      } else if ('clientX' in event) {
-        clientX = event.clientX;
-        clientY = event.clientY;
-        isTouch = false;
-      } else {
-        return;
-      }
+    const onMouseMove = (event: MouseEvent) => {
+      if (isMobileDevice || objectsRef.current.length === 0) return;
 
-      mouse.x = (clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-      // Only do raycast interaction on desktop or when touch is active
-      if (!isMobile || isTouch) {
-        raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(objects, true);
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(objectsRef.current, true);
 
-        if (hoveredObject) {
-          hoveredObject = null;
-        }
-
-        if (intersects.length > 0) {
-          let newHovered = intersects[0].object;
-          
-          while (newHovered.parent && newHovered.parent !== scene) {
-            newHovered = newHovered.parent;
-          }
-
-          if (objects.includes(newHovered)) {
-            hoveredObject = newHovered;
-          }
-        }
-      }
-    };
-
-    // Add both mouse and touch event listeners
-    window.addEventListener('mousemove', onPointerMove);
-    window.addEventListener('touchmove', onPointerMove, { passive: true });
-    
-    // Reset hover on touch end
-    const onTouchEnd = () => {
       hoveredObject = null;
-      isTouch = false;
+      if (intersects.length > 0) {
+        let obj = intersects[0].object;
+        while (obj.parent && obj.parent !== scene) {
+          obj = obj.parent;
+        }
+        if (objectsRef.current.includes(obj)) {
+          hoveredObject = obj;
+        }
+      }
     };
-    window.addEventListener('touchend', onTouchEnd);
 
-    // Smooth responsive animation loop
+    if (!isMobileDevice) {
+      window.addEventListener('mousemove', onMouseMove, { passive: true });
+    }
+
+    // Optimized animation loop
     let lastTime = 0;
-    const targetFPS = isMobile ? 30 : 60; // Lower FPS on mobile for better performance
+    const targetFPS = isMobileDevice ? 30 : 60;
     const interval = 1000 / targetFPS;
 
     const animate = (currentTime: number) => {
       animationIdRef.current = requestAnimationFrame(animate);
 
-      // Throttle frame rate on mobile
-      if (currentTime - lastTime < interval && isMobile) {
-        return;
-      }
+      if (currentTime - lastTime < interval) return;
       lastTime = currentTime;
 
-      objects.forEach((object, index) => {
+      objectsRef.current.forEach((object) => {
         const spinSpeed = (object as any).spinSpeed;
         
         if (object !== hoveredObject) {
           object.rotation.x += spinSpeed.x;
           object.rotation.y += spinSpeed.y;
           object.rotation.z += spinSpeed.z;
-        } else {
-          // Smoother hover interaction
-          const hoverDamping = isMobile ? 0.2 : 0.3;
-          object.rotation.x += spinSpeed.x * hoverDamping;
-          object.rotation.y += spinSpeed.y * hoverDamping;
-          object.rotation.z += spinSpeed.z * hoverDamping;
-          
-          // Responsive mouse following sensitivity
-          const mouseSensitivity = isMobile ? 10 : 15;
-          const mousePosition3D = new THREE.Vector3(mouse.x * mouseSensitivity, mouse.y * mouseSensitivity, 8);
-          const objectPosition = object.position;
-          const direction = new THREE.Vector3().subVectors(mousePosition3D, objectPosition).normalize();
-          
-          const targetRotation = new THREE.Euler();
-          targetRotation.setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(
-            new THREE.Vector3(0, 0, 1),
-            direction
-          ));
-          
-          // Smoother rotation interpolation
-          const rotationSpeed = isMobile ? 0.015 : 0.02;
-          object.rotation.x += (targetRotation.x - object.rotation.x) * rotationSpeed;
-          object.rotation.y += (targetRotation.y - object.rotation.y) * rotationSpeed;
+        } else if (!isMobileDevice) {
+          // Hover interaction only on desktop
+          object.rotation.x += spinSpeed.x * 0.3;
+          object.rotation.y += spinSpeed.y * 0.3;
+          object.rotation.z += spinSpeed.z * 0.3;
         }
       });
       
@@ -409,42 +322,34 @@ const Floating3DObjects: React.FC = () => {
 
     animate(0);
 
-    // Smooth responsive resize handling
+    // Throttled resize handler
+    let resizeTimeout: NodeJS.Timeout;
     const handleResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
       
       camera.aspect = width / height;
-      camera.fov = width < 768 ? 85 : 75; // Adjust FOV based on screen size
-      camera.position.z = getCameraDistance(); // Update camera distance
+      camera.fov = width < 768 ? 90 : 75;
+      camera.position.z = getCameraDistance();
       camera.updateProjectionMatrix();
       
       renderer.setSize(width, height);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      
-      // Update mobile state
-      const newIsMobile = width < 768;
-      if (newIsMobile !== isMobile) {
-        setIsMobile(newIsMobile);
-      }
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobileDevice ? 1.5 : 2));
     };
 
-    // Throttled resize for better performance
-    let resizeTimeout: NodeJS.Timeout;
     const throttledResize = () => {
       clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(handleResize, 100);
+      resizeTimeout = setTimeout(handleResize, 150);
     };
 
-    window.addEventListener('resize', throttledResize);
+    window.addEventListener('resize', throttledResize, { passive: true });
 
     // Cleanup
     return () => {
       window.removeEventListener('resize', throttledResize);
-      window.removeEventListener('resize', checkMobile);
-      window.removeEventListener('mousemove', onPointerMove);
-      window.removeEventListener('touchmove', onPointerMove);
-      window.removeEventListener('touchend', onTouchEnd);
+      if (!isMobileDevice) {
+        window.removeEventListener('mousemove', onMouseMove);
+      }
       
       if (animationIdRef.current) {
         cancelAnimationFrame(animationIdRef.current);
@@ -454,27 +359,34 @@ const Floating3DObjects: React.FC = () => {
         clearTimeout(resizeTimeout);
       }
       
-      if (mountRef.current && renderer.domElement) {
-        mountRef.current.removeChild(renderer.domElement);
-      }
-      
-      objects.forEach(object => {
+      objectsRef.current.forEach(object => {
         object.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
-            mesh.geometry.dispose();
-            if (Array.isArray(mesh.material)) {
-              mesh.material.forEach(mat => mat.dispose());
-            } else {
-              mesh.material.dispose();
+            if (mesh.geometry) mesh.geometry.dispose();
+            if (mesh.material) {
+              if (Array.isArray(mesh.material)) {
+                mesh.material.forEach(mat => mat.dispose());
+              } else {
+                mesh.material.dispose();
+              }
             }
           }
         });
       });
       
+      if (mountRef.current && renderer.domElement) {
+        mountRef.current.removeChild(renderer.domElement);
+      }
+      
       renderer.dispose();
     };
-  }, []);
+  }, [checkDevice]);
+
+  // Don't render 3D on very small screens
+  if (window.innerWidth < 480) {
+    return null;
+  }
 
   return (
     <>
@@ -489,11 +401,9 @@ const Floating3DObjects: React.FC = () => {
         }}
       />
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center z-10">
-          <div className="text-center bg-white bg-opacity-90 px-6 py-4 rounded-lg shadow-lg">
-            <p className="text-red-600 font-medium mb-2">3D Model Error</p>
-            <p className="text-sm text-gray-600 mb-4">{error}</p>
-            <p className="text-xs text-gray-500">Using geometric fallback instead</p>
+        <div className="absolute inset-0 flex items-center justify-center z-10 opacity-50">
+          <div className="text-center bg-white bg-opacity-90 px-4 py-2 rounded text-xs">
+            <p className="text-gray-600">3D view unavailable</p>
           </div>
         </div>
       )}
