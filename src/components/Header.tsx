@@ -76,9 +76,9 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
         </div>
       </div>
 
-      {/* Mobile Menu - Compact dropdown closer to button */}
+      {/* Mobile Menu - Compact dropdown directly under button */}
       {isMenuOpen && (
-        <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+        <div className="absolute top-full right-0 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
           <nav className="p-2 space-y-1" role="navigation">
             {menuItems.map((item) => (
               <button
