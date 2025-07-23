@@ -1,58 +1,101 @@
-import React, { Suspense } from 'react';
-import Floating3DObjects from './Floating3DObjects';
+import React, { Suspense, useState, useEffect } from 'react';
+
+// Lazy load the 3D component
+const Floating3DObjects = React.lazy(() => import('./Floating3DObjects'));
 
 interface HeroProps {
   onPageChange: (page: string) => void;
 }
 
 const Hero: React.FC<HeroProps> = ({ onPageChange }) => {
+  const [shouldLoad3D, setShouldLoad3D] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  useEffect(() => {
+    // Only load 3D after a delay and if not on mobile
+    const isMobile = window.innerWidth < 768;
+    const timer = setTimeout(() => {
+      if (!isMobile && navigator.hardwareConcurrency > 2) {
+        setShouldLoad3D(true);
+      }
+    }, 500); // Delay 3D loading
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Preload the background image
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => setImageLoaded(true);
+    img.onerror = () => setImageLoaded(true); // Still set to true to show fallback
+    img.src = '/concrete-background.jpg';
+  }, []);
+
   return (
     <section className="relative h-screen flex items-center justify-center overflow-hidden">
       {/* White background as base */}
       <div className="absolute inset-0 bg-white"></div>
       
-      {/* Concrete image that fades out towards bottom */}
+      {/* Background with better loading */}
       <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        className={`absolute inset-0 transition-opacity duration-500 ${
+          imageLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
         style={{
-          backgroundImage: "url('/concrete-background.jpg')",
+          backgroundImage: imageLoaded ? "url('/concrete-background.jpg')" : 'none',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          // Optimized mask for better performance
           WebkitMask: `linear-gradient(to bottom, 
             black 0%, 
-            black 25%, 
-            rgba(0,0,0,0.9) 35%, 
-            rgba(0,0,0,0.7) 45%, 
-            rgba(0,0,0,0.5) 55%, 
-            rgba(0,0,0,0.3) 65%, 
-            rgba(0,0,0,0.1) 75%, 
+            black 20%, 
+            rgba(0,0,0,0.8) 30%, 
+            rgba(0,0,0,0.6) 40%, 
+            rgba(0,0,0,0.4) 50%, 
+            rgba(0,0,0,0.2) 60%, 
+            rgba(0,0,0,0.1) 70%, 
             transparent 80%)`,
           mask: `linear-gradient(to bottom, 
             black 0%, 
-            black 25%, 
-            rgba(0,0,0,0.9) 35%, 
-            rgba(0,0,0,0.7) 45%, 
-            rgba(0,0,0,0.5) 55%, 
-            rgba(0,0,0,0.3) 65%, 
-            rgba(0,0,0,0.1) 75%, 
+            black 20%, 
+            rgba(0,0,0,0.8) 30%, 
+            rgba(0,0,0,0.6) 40%, 
+            rgba(0,0,0,0.4) 50%, 
+            rgba(0,0,0,0.2) 60%, 
+            rgba(0,0,0,0.1) 70%, 
             transparent 80%)`
         }}
       >
-        {/* Fallback concrete texture if image doesn't load */}
-        <div className="absolute inset-0 bg-gray-400 bg-[url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22 viewBox=%220 0 200 200%22%3E%3Cg fill=%22none%22 stroke=%22%23000%22 stroke-width=%220.5%22 stroke-opacity=%220.08%22%3E%3Cpath d=%22M10 10L20 20M30 10L40 20M50 10L60 20M70 10L80 20M90 10L100 20M110 10L120 20M130 10L140 20M150 10L160 20M170 10L180 20M190 10L200 20M10 30L20 40M30 30L40 40M50 30L60 40M70 30L80 40M90 30L100 40M110 30L120 40M130 30L140 40M150 30L160 40M170 30L180 40M190 30L200 40%22/%3E%3C/g%3E%3Cg fill=%22%23000%22 fill-opacity=%220.03%22%3E%3Ccircle cx=%2225%22 cy=%2225%22 r=%221%22/%3E%3Ccircle cx=%2275%22 cy=%2275%22 r=%221.5%22/%3E%3Ccircle cx=%22125%22 cy=%22125%22 r=%220.5%22/%3E%3Ccircle cx=%22175%22 cy=%22175%22 r=%221%22/%3E%3Ccircle cx=%2250%22 cy=%22150%22 r=%220.8%22/%3E%3Ccircle cx=%22150%22 cy=%2250%22 r=%221.2%22/%3E%3C/g%3E%3C/svg%3E')] opacity-60"></div>
+        {/* Simplified fallback texture */}
+        <div className="absolute inset-0 bg-gray-300 opacity-30"></div>
         
-        {/* Subtle overlay for better contrast */}
+        {/* Minimal overlay */}
         <div className="absolute inset-0 bg-black bg-opacity-5"></div>
       </div>
 
-      {/* 3D Ashtrays Only */}
-      <Suspense fallback={
-        <div className="absolute inset-0 flex items-center justify-center z-10">
-          <div className="w-12 h-12 border-3 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      }>
-        <Floating3DObjects />
-      </Suspense>
+      {/* Conditional 3D Objects */}
+      {shouldLoad3D && (
+        <Suspense fallback={
+          <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+            <div className="w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        }>
+          <Floating3DObjects />
+        </Suspense>
+      )}
+
+      {/* Optional: Add content overlay for better UX on mobile */}
+      <div className="relative z-10 text-center px-4 sm:hidden">
+        <h1 className="text-4xl font-light text-gray-800 mb-4">MOBOUR</h1>
+        <p className="text-lg text-gray-600 mb-8">Mobilier industriel épuré</p>
+        <button
+          onClick={() => onPageChange('catalog')}
+          className="bg-gray-900 text-white px-8 py-3 hover:bg-gray-800 transition-colors"
+        >
+          Découvrir
+        </button>
+      </div>
     </section>
   );
 };
