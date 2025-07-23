@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Menu, X } from 'lucide-react';
 import { useCart } from '../hooks/useCart';
 
@@ -9,17 +9,29 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { getTotalItems } = useCart();
+  const { totalItems, isLoading } = useCart();
 
-  const menuItems = [
+  // Memoize menu items to prevent unnecessary re-renders
+  const menuItems = useMemo(() => [
     { label: 'Accueil', page: 'home' },
     { label: 'Catalogue', page: 'catalog' },
     { label: 'À propos', page: 'about' },
     { label: 'Contact', page: 'contact' },
     { label: 'Panier', page: 'cart' },
-  ];
+  ], []);
 
-  const totalItems = getTotalItems();
+  const handleMenuToggle = useCallback(() => {
+    setIsMenuOpen(prev => !prev);
+  }, []);
+
+  const handleMenuItemClick = useCallback((page: string) => {
+    onPageChange(page);
+    setIsMenuOpen(false);
+  }, [onPageChange]);
+
+  const handleLogoClick = useCallback(() => {
+    onPageChange('home');
+  }, [onPageChange]);
 
   return (
     <header className="absolute top-0 left-0 right-0 z-50">
@@ -28,7 +40,7 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
           {/* MOBOUR Text - Left */}
           <div 
             className="text-2xl font-bold text-gray-900 cursor-pointer hover:opacity-75 transition-opacity"
-            onClick={() => onPageChange('home')}
+            onClick={handleLogoClick}
           >
             MOBOUR
           </div>
@@ -37,7 +49,7 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
           <div className="absolute left-1/2 transform -translate-x-1/2">
             <div 
               className="cursor-pointer hover:opacity-75 transition-opacity"
-              onClick={() => onPageChange('home')}
+              onClick={handleLogoClick}
             >
               <img 
                 src="/logo.svg" 
@@ -47,14 +59,17 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
                   background: 'transparent',
                   mixBlendMode: 'multiply' 
                 }}
+                loading="eager"
               />
             </div>
           </div>
 
           {/* Burger Menu Button - Right */}
           <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            onClick={handleMenuToggle}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            aria-label={isMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+            aria-expanded={isMenuOpen}
           >
             {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -64,14 +79,11 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
       {/* Mobile Menu */}
       {isMenuOpen && (
         <div className="bg-white border-t border-gray-100 shadow-lg">
-          <div className="px-4 py-2 space-y-1">
+          <nav className="px-4 py-2 space-y-1" role="navigation">
             {menuItems.map((item) => (
               <button
                 key={item.page}
-                onClick={() => {
-                  onPageChange(item.page);
-                  setIsMenuOpen(false);
-                }}
+                onClick={() => handleMenuItemClick(item.page)}
                 className={`flex items-center justify-between w-full px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
                   currentPage === item.page 
                     ? 'bg-gray-100 text-gray-900' 
@@ -79,14 +91,17 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
                 }`}
               >
                 <span>{item.label}</span>
-                {item.page === 'cart' && totalItems > 0 && (
-                  <span className="bg-gray-900 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {totalItems}
+                {item.page === 'cart' && !isLoading && totalItems > 0 && (
+                  <span 
+                    className="bg-gray-900 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+                    aria-label={`${totalItems} article${totalItems > 1 ? 's' : ''} dans le panier`}
+                  >
+                    {totalItems > 99 ? '99+' : totalItems}
                   </span>
                 )}
               </button>
             ))}
-          </div>
+          </nav>
         </div>
       )}
     </header>
