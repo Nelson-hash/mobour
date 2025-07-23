@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Filter, Grid, List } from 'lucide-react';
 import { Product } from '../types/product';
 import ProductCard from './ProductCard';
@@ -20,22 +20,40 @@ const ProductGrid: React.FC<ProductGridProps> = ({
   const [sortBy, setSortBy] = useState('name');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  const categories = ['Tous', ...Array.from(new Set(products.map(p => p.category)))];
+  // Memoize categories to avoid recalculation
+  const categories = useMemo(() => {
+    return ['Tous', ...Array.from(new Set(products.map(p => p.category)))];
+  }, [products]);
 
-  const filteredProducts = products
-    .filter(product => selectedCategory === 'Tous' || product.category === selectedCategory)
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'price-asc':
-          return a.price - b.price;
-        case 'price-desc':
-          return b.price - a.price;
-        case 'name':
-          return a.name.localeCompare(b.name);
-        default:
-          return 0;
-      }
-    });
+  // Memoize filtered and sorted products
+  const filteredProducts = useMemo(() => {
+    return products
+      .filter(product => selectedCategory === 'Tous' || product.category === selectedCategory)
+      .sort((a, b) => {
+        switch (sortBy) {
+          case 'price-asc':
+            return a.price - b.price;
+          case 'price-desc':
+            return b.price - a.price;
+          case 'name':
+            return a.name.localeCompare(b.name);
+          default:
+            return 0;
+        }
+      });
+  }, [products, selectedCategory, sortBy]);
+
+  const handleCategoryChange = useCallback((category: string) => {
+    setSelectedCategory(category);
+  }, []);
+
+  const handleSortChange = useCallback((sort: string) => {
+    setSortBy(sort);
+  }, []);
+
+  const handleViewModeChange = useCallback((mode: 'grid' | 'list') => {
+    setViewMode(mode);
+  }, []);
 
   return (
     <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
@@ -55,7 +73,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
               <Filter className="w-4 h-4 text-gray-600" />
               <select
                 value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
+                onChange={(e) => handleCategoryChange(e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {categories.map(category => (
@@ -69,7 +87,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
             {/* Sort Options */}
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
+              onChange={(e) => handleSortChange(e.target.value)}
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="name">Trier par nom</option>
@@ -81,7 +99,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
           {/* View Mode Toggle */}
           <div className="flex items-center space-x-2 bg-white rounded-lg p-1">
             <button
-              onClick={() => setViewMode('grid')}
+              onClick={() => handleViewModeChange('grid')}
               className={`p-2 rounded-md transition-colors ${
                 viewMode === 'grid' 
                   ? 'bg-gray-200 text-gray-900' 
@@ -91,7 +109,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
               <Grid className="w-4 h-4" />
             </button>
             <button
-              onClick={() => setViewMode('list')}
+              onClick={() => handleViewModeChange('list')}
               className={`p-2 rounded-md transition-colors ${
                 viewMode === 'list' 
                   ? 'bg-gray-200 text-gray-900' 
