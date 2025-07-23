@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { ArrowLeft, Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
 import { useCart } from '../hooks/useCart';
 
@@ -10,8 +10,18 @@ interface CartProps {
 const Cart: React.FC<CartProps> = ({ onBack, onCheckout }) => {
   const { cartItems, updateQuantity, removeFromCart, getTotalPrice, getTotalItems } = useCart();
 
-  const totalPrice = getTotalPrice();
-  const totalItems = getTotalItems();
+  // Memoize expensive calculations
+  const totalPrice = useMemo(() => getTotalPrice(), [cartItems]);
+  const totalItems = useMemo(() => getTotalItems(), [cartItems]);
+
+  // Memoize handlers to prevent unnecessary re-renders
+  const handleQuantityUpdate = useCallback((productId: number, quantity: number) => {
+    updateQuantity(productId, quantity);
+  }, [updateQuantity]);
+
+  const handleRemoveItem = useCallback((productId: number) => {
+    removeFromCart(productId);
+  }, [removeFromCart]);
 
   if (cartItems.length === 0) {
     return (
@@ -58,65 +68,12 @@ const Cart: React.FC<CartProps> = ({ onBack, onCheckout }) => {
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
             {cartItems.map((item) => (
-              <div key={item.product.id} className="bg-white rounded-lg p-6 shadow-sm">
-                <div className="flex items-center space-x-6">
-                  {/* Product Image */}
-                  <div className="w-24 h-24 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0">
-                    <img
-                      src={item.product.images[0]}
-                      alt={item.product.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-
-                  {/* Product Info */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-gray-900 mb-1">
-                      {item.product.name}
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-2">
-                      {item.product.category}
-                    </p>
-                    <p className="text-lg font-semibold text-gray-900">
-                      {item.product.price}€
-                    </p>
-                  </div>
-
-                  {/* Quantity Controls */}
-                  <div className="flex items-center space-x-3">
-                    <button
-                      onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                      className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                    >
-                      <Minus className="w-4 h-4" />
-                    </button>
-                    <span className="text-center min-w-[2rem] font-medium">
-                      {item.quantity}
-                    </span>
-                    <button
-                      onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                      className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* Subtotal */}
-                  <div className="text-right">
-                    <p className="text-lg font-semibold text-gray-900">
-                      {(item.product.price * item.quantity).toFixed(0)}€
-                    </p>
-                  </div>
-
-                  {/* Remove Button */}
-                  <button
-                    onClick={() => removeFromCart(item.product.id)}
-                    className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
+              <CartItem
+                key={item.product.id}
+                item={item}
+                onQuantityUpdate={handleQuantityUpdate}
+                onRemove={handleRemoveItem}
+              />
             ))}
           </div>
 
@@ -179,5 +136,90 @@ const Cart: React.FC<CartProps> = ({ onBack, onCheckout }) => {
     </div>
   );
 };
+
+// Memoized cart item component to prevent unnecessary re-renders
+const CartItem = React.memo<{
+  item: any;
+  onQuantityUpdate: (productId: number, quantity: number) => void;
+  onRemove: (productId: number) => void;
+}>(({ item, onQuantityUpdate, onRemove }) => {
+  const handleQuantityChange = useCallback((change: number) => {
+    onQuantityUpdate(item.product.id, item.quantity + change);
+  }, [item.product.id, item.quantity, onQuantityUpdate]);
+
+  const handleRemove = useCallback(() => {
+    onRemove(item.product.id);
+  }, [item.product.id, onRemove]);
+
+  const subtotal = useMemo(() => {
+    return (item.product.price * item.quantity).toFixed(0);
+  }, [item.product.price, item.quantity]);
+
+  return (
+    <div className="bg-white rounded-lg p-6 shadow-sm">
+      <div className="flex items-center space-x-6">
+        {/* Product Image */}
+        <div className="w-24 h-24 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0">
+          <img
+            src={item.product.images[0]}
+            alt={item.product.name}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        </div>
+
+        {/* Product Info */}
+        <div className="flex-1 min-w-0">
+          <h3 className="font-medium text-gray-900 mb-1">
+            {item.product.name}
+          </h3>
+          <p className="text-sm text-gray-600 mb-2">
+            {item.product.category}
+          </p>
+          <p className="text-lg font-semibold text-gray-900">
+            {item.product.price}€
+          </p>
+        </div>
+
+        {/* Quantity Controls */}
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => handleQuantityChange(-1)}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            disabled={item.quantity <= 1}
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+          <span className="text-center min-w-[2rem] font-medium">
+            {item.quantity}
+          </span>
+          <button
+            onClick={() => handleQuantityChange(1)}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Subtotal */}
+        <div className="text-right">
+          <p className="text-lg font-semibold text-gray-900">
+            {subtotal}€
+          </p>
+        </div>
+
+        {/* Remove Button */}
+        <button
+          onClick={handleRemove}
+          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors"
+        >
+          <Trash2 className="w-5 h-5" />
+        </button>
+      </div>
+    </div>
+  );
+});
+
+CartItem.displayName = 'CartItem';
 
 export default Cart;
