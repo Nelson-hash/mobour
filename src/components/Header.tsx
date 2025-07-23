@@ -36,16 +36,16 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
   return (
     <header className="absolute top-0 left-0 right-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-start justify-between pt-4" style={{ minHeight: '140px' }}>
-          {/* MOBOUR Text - Left */}
+        <div className="flex items-start justify-between pt-6" style={{ minHeight: '160px' }}>
+          {/* MOBOUR Text - Left - Made bigger */}
           <div 
-            className="text-2xl font-bold text-gray-900 cursor-pointer hover:opacity-75 transition-opacity"
+            className="text-3xl sm:text-4xl font-bold text-gray-900 cursor-pointer hover:opacity-75 transition-opacity"
             onClick={handleLogoClick}
           >
             MOBOUR
           </div>
 
-          {/* Centered Logo - Your SVG Logo */}
+          {/* Centered Logo - Made bigger */}
           <div className="absolute left-1/2 transform -translate-x-1/2">
             <div 
               className="cursor-pointer hover:opacity-75 transition-opacity"
@@ -54,7 +54,7 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
               <img 
                 src="/logo.svg" 
                 alt="MOBOUR" 
-                className="h-12 w-auto"
+                className="h-16 sm:h-20 w-auto"
                 style={{ 
                   background: 'transparent',
                   mixBlendMode: 'multiply' 
@@ -64,14 +64,14 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
             </div>
           </div>
 
-          {/* Burger Menu Button - Right */}
+          {/* Burger Menu Button - Right - Made bigger */}
           <button
             onClick={handleMenuToggle}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-3 hover:bg-gray-100 rounded-full transition-colors"
             aria-label={isMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
             aria-expanded={isMenuOpen}
           >
-            {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
       </div>
