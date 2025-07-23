@@ -12,10 +12,10 @@ const Hero: React.FC<HeroProps> = ({ onPageChange }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
 
   useEffect(() => {
-    // Only load 3D after a delay and if not on mobile
-    const isMobile = window.innerWidth < 768;
+    // Only load 3D after a delay and check for basic device capabilities
     const timer = setTimeout(() => {
-      if (!isMobile && navigator.hardwareConcurrency > 2) {
+      // More permissive loading - allow on most devices
+      if (navigator.hardwareConcurrency > 1 || window.innerWidth >= 768) {
         setShouldLoad3D(true);
       }
     }, 500); // Delay 3D loading
@@ -84,18 +84,6 @@ const Hero: React.FC<HeroProps> = ({ onPageChange }) => {
           <Floating3DObjects />
         </Suspense>
       )}
-
-      {/* Optional: Add content overlay for better UX on mobile */}
-      <div className="relative z-10 text-center px-4 sm:hidden">
-        <h1 className="text-4xl font-light text-gray-800 mb-4">MOBOUR</h1>
-        <p className="text-lg text-gray-600 mb-8">Mobilier industriel épuré</p>
-        <button
-          onClick={() => onPageChange('catalog')}
-          className="bg-gray-900 text-white px-8 py-3 hover:bg-gray-800 transition-colors"
-        >
-          Découvrir
-        </button>
-      </div>
     </section>
   );
 };
