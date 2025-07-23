@@ -10,8 +10,29 @@ export default defineConfig({
   },
   assetsInclude: ['**/*.glb', '**/*.gltf'],
   build: {
+    target: 'es2015',
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          three: ['three']
+        }
+      }
+    },
     commonjsOptions: {
       include: [/three/, /node_modules/]
+    }
+  },
+  server: {
+    hmr: {
+      overlay: false
     }
   }
 });
