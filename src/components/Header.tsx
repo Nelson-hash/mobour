@@ -45,8 +45,8 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
             MOBOUR
           </div>
 
-          {/* Centered Logo - Made bigger */}
-          <div className="absolute left-1/2 transform -translate-x-1/2">
+          {/* Centered Logo - Made bigger and higher */}
+          <div className="absolute left-1/2 transform -translate-x-1/2 -translate-y-2">
             <div 
               className="cursor-pointer hover:opacity-75 transition-opacity"
               onClick={handleLogoClick}
@@ -76,10 +76,10 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu - Compact dropdown */}
       {isMenuOpen && (
-        <div className="bg-white border-t border-gray-100 shadow-lg">
-          <nav className="px-4 py-2 space-y-1" role="navigation">
+        <div className="absolute top-full right-4 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+          <nav className="p-2 space-y-1" role="navigation">
             {menuItems.map((item) => (
               <button
                 key={item.page}
