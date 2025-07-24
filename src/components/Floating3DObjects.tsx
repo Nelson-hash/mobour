@@ -7,17 +7,9 @@ const GLTFLoader = (() => {
   }
   class GLTFLoader {
     load(url: string, onLoad: (gltf: any) => void, onProgress?: (p: any) => void, onError?: (e: any) => void) {
-      Promise.all([
-        import('three/examples/jsm/loaders/GLTFLoader.js'),
-        import('three/examples/jsm/loaders/EXRLoader.js').catch(() => null)
-      ])
-        .then(([gltfModule, exrModule]) => {
-          const loader = new gltfModule.GLTFLoader();
-          if (exrModule && !((window as any).THREE && (window as any).THREE.EXRLoader)) {
-            // Make EXR loader available globally for texture loading
-            if (!(window as any).THREE) (window as any).THREE = {};
-            (window as any).THREE.EXRLoader = exrModule.EXRLoader;
-          }
+      import('three/examples/jsm/loaders/GLTFLoader.js')
+        .then((module) => {
+          const loader = new module.GLTFLoader();
           loader.load(url, onLoad, onProgress, onError);
         })
         .catch((importError) => {
@@ -240,7 +232,6 @@ const Floating3DObjects: React.FC = () => {
     // ---- Texture Handling ----
     const COLOR_HEX = '#525350';
     const textureLoader = new THREE.TextureLoader();
-    const exrLoader = new (THREE as any).EXRLoader ? new (THREE as any).EXRLoader() : null;
     textureLoader.setCrossOrigin('anonymous');
     
     let diffuseTexture: THREE.Texture | null = null;
@@ -283,57 +274,35 @@ const Floating3DObjects: React.FC = () => {
           handleError('Diffuse')
         );
 
-        // Load Normal texture
-        if (exrLoader) {
-          exrLoader.load(
-            '/textures/anthracite-normal.exr',
-            (texture: THREE.Texture) => {
-              console.log('Normal texture loaded');
-              texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-              texture.repeat.set(2, 2);
-              texture.needsUpdate = true;
-              normalTexture = texture;
-              checkComplete();
-            },
-            undefined,
-            handleError('Normal')
-          );
-        } else {
-          // Fallback: try loading as regular texture
-          textureLoader.load(
-            '/textures/anthracite-normal.exr',
-            (texture) => {
-              console.log('Normal texture loaded (fallback)');
-              texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-              texture.repeat.set(2, 2);
-              texture.needsUpdate = true;
-              normalTexture = texture;
-              checkComplete();
-            },
-            undefined,
-            handleError('Normal')
-          );
-        }
+        // Load Normal texture - try as regular texture first
+        textureLoader.load(
+          '/textures/anthracite-normal.exr',
+          (texture) => {
+            console.log('Normal texture loaded');
+            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(2, 2);
+            texture.needsUpdate = true;
+            normalTexture = texture;
+            checkComplete();
+          },
+          undefined,
+          handleError('Normal')
+        );
 
-        // Load Roughness texture
-        if (exrLoader) {
-          exrLoader.load(
-            '/textures/anthracite-roughness.exr',
-            (texture: THREE.Texture) => {
-              console.log('Roughness texture loaded');
-              texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-              texture.repeat.set(2, 2);
-              texture.needsUpdate = true;
-              roughnessTexture = texture;
-              checkComplete();
-            },
-            undefined,
-            handleError('Roughness')
-          );
-        } else {
-          console.warn('EXR loader not available, skipping roughness texture');
-          checkComplete();
-        }
+        // Load Roughness texture - try as regular texture first
+        textureLoader.load(
+          '/textures/anthracite-roughness.exr',
+          (texture) => {
+            console.log('Roughness texture loaded');
+            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(2, 2);
+            texture.needsUpdate = true;
+            roughnessTexture = texture;
+            checkComplete();
+          },
+          undefined,
+          handleError('Roughness')
+        );
 
         // Load Displacement texture
         textureLoader.load(
