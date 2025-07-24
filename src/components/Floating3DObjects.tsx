@@ -274,9 +274,9 @@ const Floating3DObjects: React.FC = () => {
           handleError('Diffuse')
         );
 
-        // Load Normal texture - try as regular texture first
+        // Load Normal texture - now PNG
         textureLoader.load(
-          '/textures/anthracite-normal.exr',
+          '/textures/anthracite-normal.png',
           (texture) => {
             console.log('Normal texture loaded');
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
@@ -289,9 +289,9 @@ const Floating3DObjects: React.FC = () => {
           handleError('Normal')
         );
 
-        // Load Roughness texture - try as regular texture first
+        // Load Roughness texture - now PNG
         textureLoader.load(
-          '/textures/anthracite-roughness.exr',
+          '/textures/anthracite-roughness.png',
           (texture) => {
             console.log('Roughness texture loaded');
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
