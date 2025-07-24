@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, ShoppingBag, Heart, Share2, Minus, Plus, Star } from 'lucide-react';
+import { ShoppingBag, Share2, Minus, Plus } from 'lucide-react';
 import { Product } from '../types/product';
 import { useCart } from '../hooks/useCart';
 
@@ -26,26 +26,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack }) => {
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Breadcrumbs */}
-      <div className="bg-gray-50 py-4">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <button 
-              onClick={onBack}
-              className="flex items-center space-x-1 hover:text-gray-900 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Retour</span>
-            </button>
-            <span>/</span>
-            <span>{product.category}</span>
-            <span>/</span>
-            <span className="text-gray-900 font-medium">{product.name}</span>
-          </div>
-        </div>
-      </div>
-
+    <div className="min-h-screen bg-white pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Images */}
@@ -98,16 +79,6 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack }) => {
               {product.name}
             </h1>
 
-            {/* Rating */}
-            <div className="flex items-center space-x-2">
-              <div className="flex items-center">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-5 h-5 fill-current text-yellow-400" />
-                ))}
-              </div>
-              <span className="text-sm text-gray-600">(4.8) • 124 avis</span>
-            </div>
-
             {/* Price */}
             <div className="text-4xl font-bold text-gray-900">
               {product.price}€
@@ -115,7 +86,8 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack }) => {
 
             {/* Description */}
             <p className="text-lg text-gray-600 leading-relaxed">
-              {product.description}
+              Cendrier au design industriel épuré, alliant esthétisme et fonctionnalité. 
+              Fabriqué avec des matériaux de qualité pour une utilisation durable et élégante.
             </p>
 
             {/* Specifications */}
@@ -177,10 +149,6 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack }) => {
                 >
                   <ShoppingBag className="w-5 h-5" />
                   <span>{product.inStock ? 'Ajouter au Panier' : 'Produit Épuisé'}</span>
-                </button>
-
-                <button className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                  <Heart className="w-5 h-5 text-gray-600" />
                 </button>
 
                 <button className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
