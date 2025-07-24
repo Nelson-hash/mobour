@@ -152,42 +152,17 @@ const Floating3DObjects: React.FC = () => {
       ];
 
       return particleConfigs.map((config, index) => {
-        // Clone the original ashtray geometry and materials
+        // Clone the original ashtray
         const miniAshtray = originalAshtray.clone();
         
-        // Create particle material based on base material
-        const particleMaterial = baseMaterial.clone();
-        particleMaterial.transparent = false; // Remove transparency
-        particleMaterial.opacity = 1.0; // Full opacity
-        particleMaterial.roughness = 0.9;
-        particleMaterial.metalness = 0.02;
-        
-        // Apply same textures to particles but with different scaling
-        if (diffuseTexture) {
-          const particleDiffuse = diffuseTexture.clone();
-          particleDiffuse.repeat.set(1, 1); // Smaller repeat for particles
-          particleDiffuse.needsUpdate = true;
-          particleMaterial.map = particleDiffuse;
-        }
-        if (normalTexture) {
-          const particleNormal = normalTexture.clone();
-          particleNormal.repeat.set(1, 1);
-          particleNormal.needsUpdate = true;
-          particleMaterial.normalMap = particleNormal;
-          particleMaterial.normalScale = new THREE.Vector2(0.05, 0.05); // Extremely subtle normal for particles
-        }
-        if (roughnessTexture) {
-          const particleRoughness = roughnessTexture.clone();
-          particleRoughness.repeat.set(1, 1);
-          particleRoughness.needsUpdate = true;
-          particleMaterial.roughnessMap = particleRoughness;
-        }
-        
-        // Apply the material to all meshes in the mini ashtray
+        // Apply materials to all meshes in the mini ashtray
         miniAshtray.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
-            mesh.material = particleMaterial.clone();
+            const particleMaterial = baseMaterial.clone();
+            particleMaterial.transparent = false;
+            particleMaterial.opacity = 1.0;
+            mesh.material = particleMaterial;
             if (!isMobile) {
               mesh.castShadow = true;
               mesh.receiveShadow = true;
@@ -195,8 +170,8 @@ const Floating3DObjects: React.FC = () => {
           }
         });
         
-        // Scale the mini ashtray based on config size
-        const scaleMultiplier = config.size * 0.3; // Make them smaller relative to main ashtray
+        // Scale the mini ashtray
+        const scaleMultiplier = config.size * 0.3;
         miniAshtray.scale.setScalar(getScale() * scaleMultiplier);
         
         // Set initial position
@@ -205,7 +180,7 @@ const Floating3DObjects: React.FC = () => {
         miniAshtray.position.z = Math.sin(angle) * config.distance * config.eccentricity;
         miniAshtray.position.y = config.offsetY;
         
-        // Add some random rotation to each mini ashtray
+        // Add random rotation
         miniAshtray.rotation.x = Math.random() * Math.PI;
         miniAshtray.rotation.y = Math.random() * Math.PI * 2;
         miniAshtray.rotation.z = Math.random() * Math.PI;
@@ -446,48 +421,7 @@ const Floating3DObjects: React.FC = () => {
         setIsLoaded(true);
       } catch (err) {
         console.error('Failed to load GLTF model:', err);
-        console.log('Attempting to use geometric fallback...');
-        
-        // Create geometric fallback
-        try {
-          const fallbackLoader = new GLTFLoader();
-          const fallbackScene = (fallbackLoader as any).createGeometricAshtray();
-          
-          ashtray = fallbackScene;
-          ashtray.position.set(0, 0, 0);
-          ashtray.rotation.set(0.3, 1.2, -0.1);
-          ashtray.scale.setScalar(getScale());
-          
-          (ashtray as any).spinSpeed = {
-            x: (Math.random() - 0.5) * (isMobile ? 0.015 : 0.02),
-            y: (Math.random() - 0.5) * (isMobile ? 0.02 : 0.03),
-            z: (Math.random() - 0.5) * (isMobile ? 0.018 : 0.025)
-          };
-          
-          scene.add(ashtray);
-          console.log('Geometric fallback ashtray created');
-          
-          // Create basic material for fallback
-          const fallbackMaterial = new THREE.MeshStandardMaterial({
-            color: new THREE.Color('#8a8a8a'),
-            roughness: 0.7,
-            metalness: 0.0
-          });
-          
-          // Try to create particles with fallback
-          try {
-            particles = createParticles(fallbackMaterial, ashtray);
-            console.log('Fallback particles created');
-          } catch (particleError) {
-            console.error('Error creating fallback particles:', particleError);
-            particles = [];
-          }
-          
-          setIsLoaded(true);
-        } catch (fallbackError) {
-          console.error('Fallback creation failed:', fallbackError);
-          setError('Model loading failed. Please check /models/ashtray.glb file.');
-        }
+        setError('Model loading failed. Check /models/ashtray.glb.');
       }
     };
 
