@@ -64,17 +64,6 @@ function App() {
 
   // Memoize the current page component to avoid unnecessary re-renders
   const currentPageComponent = useMemo(() => {
-    const pageProps = {
-      onPageChange: handlePageChange,
-      onViewProduct: handleViewProduct,
-      onBack: handleBackFromProduct,
-      onCheckout: handleCheckout,
-      onOrderComplete: handleOrderComplete,
-      onBackToCart: handleBackToCart,
-      onBackToCatalog: handleBackToCatalog,
-      selectedProduct
-    };
-
     switch (currentPage) {
       case 'home':
         return (
