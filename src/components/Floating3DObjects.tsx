@@ -446,7 +446,48 @@ const Floating3DObjects: React.FC = () => {
         setIsLoaded(true);
       } catch (err) {
         console.error('Failed to load GLTF model:', err);
-        setError('Model loading failed. Check /models/ashtray.glb.');
+        console.log('Attempting to use geometric fallback...');
+        
+        // Create geometric fallback
+        try {
+          const fallbackLoader = new GLTFLoader();
+          const fallbackScene = (fallbackLoader as any).createGeometricAshtray();
+          
+          ashtray = fallbackScene;
+          ashtray.position.set(0, 0, 0);
+          ashtray.rotation.set(0.3, 1.2, -0.1);
+          ashtray.scale.setScalar(getScale());
+          
+          (ashtray as any).spinSpeed = {
+            x: (Math.random() - 0.5) * (isMobile ? 0.015 : 0.02),
+            y: (Math.random() - 0.5) * (isMobile ? 0.02 : 0.03),
+            z: (Math.random() - 0.5) * (isMobile ? 0.018 : 0.025)
+          };
+          
+          scene.add(ashtray);
+          console.log('Geometric fallback ashtray created');
+          
+          // Create basic material for fallback
+          const fallbackMaterial = new THREE.MeshStandardMaterial({
+            color: new THREE.Color('#8a8a8a'),
+            roughness: 0.7,
+            metalness: 0.0
+          });
+          
+          // Try to create particles with fallback
+          try {
+            particles = createParticles(fallbackMaterial, ashtray);
+            console.log('Fallback particles created');
+          } catch (particleError) {
+            console.error('Error creating fallback particles:', particleError);
+            particles = [];
+          }
+          
+          setIsLoaded(true);
+        } catch (fallbackError) {
+          console.error('Fallback creation failed:', fallbackError);
+          setError('Model loading failed. Please check /models/ashtray.glb file.');
+        }
       }
     };
 
