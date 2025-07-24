@@ -190,7 +190,7 @@ const Floating3DObjects: React.FC = () => {
           particleNormal.repeat.set(1, 1);
           particleNormal.needsUpdate = true;
           particleMaterial.normalMap = particleNormal;
-          particleMaterial.normalScale = new THREE.Vector2(0.5, 0.5); // Reduced normal intensity
+          particleMaterial.normalScale = new THREE.Vector2(0.15, 0.15); // Very subtle normal for particles
         }
         if (roughnessTexture) {
           const particleRoughness = roughnessTexture.clone();
@@ -274,9 +274,9 @@ const Floating3DObjects: React.FC = () => {
           handleError('Diffuse')
         );
 
-        // Load Normal texture - now PNG
+        // Load Normal texture - back to EXR
         textureLoader.load(
-          '/textures/anthracite-normal.png',
+          '/textures/anthracite-normal.exr',
           (texture) => {
             console.log('Normal texture loaded');
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
@@ -289,9 +289,9 @@ const Floating3DObjects: React.FC = () => {
           handleError('Normal')
         );
 
-        // Load Roughness texture - now PNG
+        // Load Roughness texture - back to EXR
         textureLoader.load(
-          '/textures/anthracite-roughness.png',
+          '/textures/anthracite-roughness.exr',
           (texture) => {
             console.log('Roughness texture loaded');
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
@@ -334,9 +334,9 @@ const Floating3DObjects: React.FC = () => {
         ashtray.scale.setScalar(getScale());
 
         const baseMaterialParams: THREE.MeshStandardMaterialParameters = {
-          color: COLOR_HEX,
-          roughness: 0.8,
-          metalness: 0.05,
+          color: new THREE.Color('#6b6b6b'), // Lighter concrete gray
+          roughness: 0.6,
+          metalness: 0.0, // Concrete is not metallic at all
           transparent: true,
           opacity: 0
         };
@@ -348,19 +348,26 @@ const Floating3DObjects: React.FC = () => {
         }
         if (normalTexture) {
           baseMaterialParams.normalMap = normalTexture;
-          baseMaterialParams.normalScale = new THREE.Vector2(1.0, 1.0);
+          // Reduce normal intensity significantly
+          baseMaterialParams.normalScale = new THREE.Vector2(0.3, 0.3);
           console.log('Applied normal texture');
         }
         if (roughnessTexture) {
           baseMaterialParams.roughnessMap = roughnessTexture;
-          baseMaterialParams.roughness = 1.0; // Let the texture control roughness
+          // Lower base roughness when using roughness map
+          baseMaterialParams.roughness = 0.6;
           console.log('Applied roughness texture');
         }
         if (displacementTexture) {
           baseMaterialParams.displacementMap = displacementTexture;
-          baseMaterialParams.displacementScale = isMobile ? 0.05 : 0.1; // Subtle displacement
+          // Much more subtle displacement
+          baseMaterialParams.displacementScale = isMobile ? 0.01 : 0.02;
           console.log('Applied displacement texture');
         }
+
+        // Ensure proper material properties for concrete look
+        baseMaterialParams.metalness = 0.0; // Concrete is not metallic
+        baseMaterialParams.color = new THREE.Color('#6b6b6b'); // Lighter gray base color
 
         const templateMaterial = new THREE.MeshStandardMaterial(baseMaterialParams);
 
