@@ -1,18 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 
-// Import GLTFLoader from the CDN-hosted examples (same fallback as before)
 const GLTFLoader = (() => {
   if (typeof window !== 'undefined' && (window as any).THREE) {
     return (window as any).THREE.GLTFLoader;
   }
   class GLTFLoader {
-    load(
-      url: string,
-      onLoad: (gltf: any) => void,
-      onProgress?: (progress: any) => void,
-      onError?: (error: any) => void
-    ) {
+    load(url: string, onLoad: (gltf: any) => void, onProgress?: (p: any) => void, onError?: (e: any) => void) {
       import('three/examples/jsm/loaders/GLTFLoader.js')
         .then((module) => {
           const loader = new module.GLTFLoader();
@@ -24,7 +18,7 @@ const GLTFLoader = (() => {
           onLoad({ scene });
         });
     }
-    
+
     createGeometricAshtray() {
       const group = new THREE.Group();
       const bodyGeometry = new THREE.CylinderGeometry(2, 2.5, 0.5, 32);
@@ -38,7 +32,7 @@ const GLTFLoader = (() => {
       const inner = new THREE.Mesh(innerGeometry, innerMaterial);
       inner.position.y = 0.35;
       group.add(inner);
-      
+
       for (let i = 0; i < 3; i++) {
         const notchGeometry = new THREE.BoxGeometry(0.3, 0.2, 0.1);
         const notch = new THREE.Mesh(notchGeometry, bodyMaterial.clone());
@@ -66,20 +60,16 @@ const Floating3DObjects: React.FC = () => {
   useEffect(() => {
     if (!mountRef.current) return;
 
-    // ---------- Helpers ----------
     const isMobileScreen = () => window.innerWidth < 768;
-    const SCALE_FACTOR = 0.512; // 0.8 * 0.8 = 0.64, then again 0.8 => 0.512 total
-    const getScale = () => {
-      const BASE_MOBILE = 15.0;
-      const BASE_DESKTOP = 24.0;
-      return (isMobileScreen() ? BASE_MOBILE : BASE_DESKTOP) * SCALE_FACTOR;
-    };
+    const SCALE_FACTOR = 0.512; // final factor (another 20% applied)
+    const BASE_MOBILE = 15.0;
+    const BASE_DESKTOP = 24.0;
+    const getScale = () => (isMobileScreen() ? BASE_MOBILE : BASE_DESKTOP) * SCALE_FACTOR;
 
     const checkMobile = () => setIsMobile(isMobileScreen());
     checkMobile();
     window.addEventListener('resize', checkMobile);
 
-    // ---------- Scene / Camera / Renderer ----------
     const scene = new THREE.Scene();
 
     const camera = new THREE.PerspectiveCamera(
@@ -88,6 +78,7 @@ const Floating3DObjects: React.FC = () => {
       0.1,
       1000
     );
+
     const getCameraDistance = () => {
       if (window.innerWidth < 480) return 45;
       if (window.innerWidth < 768) return 40;
@@ -104,20 +95,16 @@ const Floating3DObjects: React.FC = () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setClearColor(0x000000, 0);
-
-    // Output color space (Three r152+)
+    // color space
     (renderer as any).outputColorSpace = THREE.SRGBColorSpace ?? undefined;
-    // For older versions:
     if ((renderer as any).outputEncoding !== undefined) {
       (renderer as any).outputEncoding = THREE.sRGBEncoding;
     }
-
     renderer.shadowMap.enabled = !isMobile;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
     mountRef.current.appendChild(renderer.domElement);
 
-    // ---------- Lights ----------
     const ambientLight = new THREE.AmbientLight(0xf0f0f0, isMobile ? 0.8 : 0.7);
     scene.add(ambientLight);
 
@@ -137,32 +124,33 @@ const Floating3DObjects: React.FC = () => {
     accentLight.position.set(0, 10, 0);
     scene.add(accentLight);
 
-    // ---------- Model ----------
     const loader = new GLTFLoader();
     let ashtray: THREE.Object3D | null = null;
     let hoveredObject: THREE.Object3D | null = null;
 
-    // Prepare texture and fallback color
+    // ---- Texture Handling ----
     const COLOR_HEX = '#525350';
     const textureLoader = new THREE.TextureLoader();
+    textureLoader.setCrossOrigin('anonymous');
     let texture: THREE.Texture | null = null;
 
-    const tryLoadTexture = (): Promise<void> =>
-      new Promise((resolve) => {
+    const loadTexture = () =>
+      new Promise<void>((resolve) => {
         textureLoader.load(
           '/textures/anthracite.png',
           (t) => {
+            console.log('Texture loaded:', t.image?.src || t);
+            if ('colorSpace' in t) (t as any).colorSpace = THREE.SRGBColorSpace;
+            else if ('encoding' in t) (t as any).encoding = THREE.sRGBEncoding;
             t.wrapS = t.wrapT = THREE.RepeatWrapping;
             t.repeat.set(2, 2);
-            // Newer three:
-            (t as any).colorSpace = THREE.SRGBColorSpace ?? undefined;
-            // Older three:
-            if ((t as any).encoding !== undefined) (t as any).encoding = THREE.sRGBEncoding;
+            t.needsUpdate = true;
             texture = t;
             resolve();
           },
           undefined,
-          () => {
+          (err) => {
+            console.error('Texture load error:', err);
             texture = null;
             resolve();
           }
@@ -171,7 +159,7 @@ const Floating3DObjects: React.FC = () => {
 
     const loadModel = async () => {
       try {
-        await tryLoadTexture();
+        await loadTexture();
 
         const gltf = await new Promise<any>((resolve, reject) => {
           loader.load('/models/ashtray.glb', resolve, undefined, reject);
@@ -189,9 +177,7 @@ const Floating3DObjects: React.FC = () => {
           transparent: true,
           opacity: 0
         };
-
         if (texture) baseMaterialParams.map = texture;
-
         const templateMaterial = new THREE.MeshStandardMaterial(baseMaterialParams);
 
         ashtray.traverse((child) => {
@@ -213,12 +199,12 @@ const Floating3DObjects: React.FC = () => {
 
         scene.add(ashtray);
 
-        // Fade in
-        const start = Date.now();
+        // Fade-in
+        const startTime = Date.now();
         const fadeDuration = isMobile ? 600 : 800;
         const fadeIn = () => {
           if (!ashtray) return;
-          const elapsed = Date.now() - start;
+          const elapsed = Date.now() - startTime;
           const p = Math.min(elapsed / fadeDuration, 1);
           const eased = 1 - Math.pow(1 - p, 3);
           ashtray.traverse((child) => {
@@ -243,13 +229,13 @@ const Floating3DObjects: React.FC = () => {
         setIsLoaded(true);
       } catch (err) {
         console.error('Failed to load GLTF model:', err);
-        setError('Model loading failed. Please ensure /models/ashtray.glb exists.');
+        setError('Model loading failed. Check /models/ashtray.glb.');
       }
     };
 
     loadModel();
 
-    // ---------- Interaction ----------
+    // ---- Interaction ----
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
     let isTouch = false;
@@ -297,15 +283,15 @@ const Floating3DObjects: React.FC = () => {
     };
     window.addEventListener('touchend', onTouchEnd);
 
-    // ---------- Animate ----------
+    // ---- Animate ----
     let lastTime = 0;
     const targetFPS = isMobile ? 30 : 60;
-    const frameInterval = 1000 / targetFPS;
+    const interval = 1000 / targetFPS;
 
-    const animate = (currentTime: number) => {
+    const animate = (time: number) => {
       animationIdRef.current = requestAnimationFrame(animate);
-      if (isMobile && currentTime - lastTime < frameInterval) return;
-      lastTime = currentTime;
+      if (isMobile && time - lastTime < interval) return;
+      lastTime = time;
 
       if (ashtray) {
         const spin = (ashtray as any).spinSpeed;
@@ -334,7 +320,7 @@ const Floating3DObjects: React.FC = () => {
     };
     animate(0);
 
-    // ---------- Resize ----------
+    // ---- Resize ----
     const handleResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
@@ -361,7 +347,7 @@ const Floating3DObjects: React.FC = () => {
     };
     window.addEventListener('resize', throttledResize);
 
-    // ---------- Cleanup ----------
+    // ---- Cleanup ----
     return () => {
       window.removeEventListener('resize', throttledResize);
       window.removeEventListener('resize', checkMobile);
@@ -386,7 +372,6 @@ const Floating3DObjects: React.FC = () => {
       if (mountRef.current && renderer.domElement) {
         mountRef.current.removeChild(renderer.domElement);
       }
-
       renderer.dispose();
     };
   }, []);
