@@ -179,15 +179,15 @@ const Floating3DObjects: React.FC = () => {
         ashtray.position.set(0, 0, 0);
         ashtray.rotation.set(0.3, 1.2, -0.1);
         
-        // Make it bigger since it's the only one
-        const scale = window.innerWidth < 768 ? 5.0 : 8.0;
+        // Make it much bigger (3x larger than before)
+        const scale = window.innerWidth < 768 ? 15.0 : 24.0; // 3x bigger than previous 5.0/8.0
         ashtray.scale.setScalar(scale);
 
-        // Apply ceramic material
-        const ceramicMaterial = new THREE.MeshPhongMaterial({ 
-          color: 0xf8f8f8,
-          shininess: 15,
-          specular: 0x888888,
+        // Apply anthracite material with realistic texture
+        const anthraciteMaterial = new THREE.MeshPhongMaterial({ 
+          color: 0x2c2c2c, // Anthracite color (dark gray)
+          shininess: 8,     // Low shininess for matte finish
+          specular: 0x404040, // Subtle specular highlights
           transparent: true,
           opacity: 0
         });
@@ -195,7 +195,7 @@ const Floating3DObjects: React.FC = () => {
         ashtray.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
-            mesh.material = ceramicMaterial.clone();
+            mesh.material = anthraciteMaterial.clone();
             if (!isMobile) {
               mesh.castShadow = true;
               mesh.receiveShadow = true;
