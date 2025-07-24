@@ -85,12 +85,11 @@ const Floating3DObjects: React.FC = () => {
     // --- Helpers ---
     const isMobileScreen = () => window.innerWidth < 768;
     const getScale = () => {
-      // Original values: mobile 15.0, desktop 24.0
-      // Reduce 20% => * 0.8
       const BASE_MOBILE = 15.0;
       const BASE_DESKTOP = 24.0;
-      return (isMobileScreen() ? BASE_MOBILE : BASE_DESKTOP) * 0.8;
+    return (isMobileScreen() ? BASE_MOBILE : BASE_DESKTOP) * 0.64; // 36% of original reduction
     };
+
 
     // Detect mobile/tablet
     const checkMobile = () => {
