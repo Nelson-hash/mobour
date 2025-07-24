@@ -103,6 +103,14 @@ const Floating3DObjects: React.FC = () => {
     renderer.shadowMap.enabled = !isMobile;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
+    
+    // Set fixed positioning to prevent scroll issues
+    renderer.domElement.style.position = 'fixed';
+    renderer.domElement.style.top = '0';
+    renderer.domElement.style.left = '0';
+    renderer.domElement.style.zIndex = '1';
+    renderer.domElement.style.pointerEvents = 'none';
+    
     mountRef.current.appendChild(renderer.domElement);
 
     const ambientLight = new THREE.AmbientLight(0xf0f0f0, isMobile ? 0.8 : 0.7);
@@ -167,7 +175,10 @@ const Floating3DObjects: React.FC = () => {
         // 1 medium particle
         { size: 1.4, distance: 18, speed: 0.008, offsetY: 1, eccentricity: 0.6 },
         // 1 large particle
-        { size: 2.2, distance: 22, speed: -0.006, offsetY: -1.5, eccentricity: 0.9 }
+        { size: 2.2, distance: 22, speed: -0.006, offsetY: -1.5, eccentricity: 0.9 },
+        // 2 additional particles
+        { size: 1.0, distance: 14, speed: 0.011, offsetY: 3.5, eccentricity: 0.75 },
+        { size: 1.6, distance: 20, speed: -0.009, offsetY: -2.5, eccentricity: 0.65 }
       ];
 
       return particleConfigs.map((config, index) => {
@@ -641,11 +652,11 @@ const Floating3DObjects: React.FC = () => {
     <>
       <div
         ref={mountRef}
-        className={`absolute inset-0 transition-opacity duration-1000 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+        className={`fixed inset-0 transition-opacity duration-1000 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
         style={{ pointerEvents: 'none', zIndex: 1 }}
       />
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center z-10">
+        <div className="fixed inset-0 flex items-center justify-center z-10">
           <div className="text-center bg-white bg-opacity-90 px-6 py-4 rounded-lg shadow-lg">
             <p className="text-red-600 font-medium mb-2">3D Model Error</p>
             <p className="text-sm text-gray-600 mb-4">{error}</p>
