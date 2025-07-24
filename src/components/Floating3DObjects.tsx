@@ -7,9 +7,17 @@ const GLTFLoader = (() => {
   }
   class GLTFLoader {
     load(url: string, onLoad: (gltf: any) => void, onProgress?: (p: any) => void, onError?: (e: any) => void) {
-      import('three/examples/jsm/loaders/GLTFLoader.js')
-        .then((module) => {
-          const loader = new module.GLTFLoader();
+      Promise.all([
+        import('three/examples/jsm/loaders/GLTFLoader.js'),
+        import('three/examples/jsm/loaders/EXRLoader.js').catch(() => null)
+      ])
+        .then(([gltfModule, exrModule]) => {
+          const loader = new gltfModule.GLTFLoader();
+          if (exrModule && !((window as any).THREE && (window as any).THREE.EXRLoader)) {
+            // Make EXR loader available globally for texture loading
+            if (!(window as any).THREE) (window as any).THREE = {};
+            (window as any).THREE.EXRLoader = exrModule.EXRLoader;
+          }
           loader.load(url, onLoad, onProgress, onError);
         })
         .catch((importError) => {
@@ -178,6 +186,27 @@ const Floating3DObjects: React.FC = () => {
         particleMaterial.roughness = 0.9;
         particleMaterial.metalness = 0.02;
         
+        // Apply same textures to particles but with different scaling
+        if (diffuseTexture) {
+          const particleDiffuse = diffuseTexture.clone();
+          particleDiffuse.repeat.set(1, 1); // Smaller repeat for particles
+          particleDiffuse.needsUpdate = true;
+          particleMaterial.map = particleDiffuse;
+        }
+        if (normalTexture) {
+          const particleNormal = normalTexture.clone();
+          particleNormal.repeat.set(1, 1);
+          particleNormal.needsUpdate = true;
+          particleMaterial.normalMap = particleNormal;
+          particleMaterial.normalScale = new THREE.Vector2(0.5, 0.5); // Reduced normal intensity
+        }
+        if (roughnessTexture) {
+          const particleRoughness = roughnessTexture.clone();
+          particleRoughness.repeat.set(1, 1);
+          particleRoughness.needsUpdate = true;
+          particleMaterial.roughnessMap = particleRoughness;
+        }
+        
         const particle = new THREE.Mesh(blobGeometry, particleMaterial);
         
         // Set initial position
@@ -211,35 +240,120 @@ const Floating3DObjects: React.FC = () => {
     // ---- Texture Handling ----
     const COLOR_HEX = '#525350';
     const textureLoader = new THREE.TextureLoader();
+    const exrLoader = new (THREE as any).EXRLoader ? new (THREE as any).EXRLoader() : null;
     textureLoader.setCrossOrigin('anonymous');
-    let texture: THREE.Texture | null = null;
+    
+    let diffuseTexture: THREE.Texture | null = null;
+    let normalTexture: THREE.Texture | null = null;
+    let roughnessTexture: THREE.Texture | null = null;
+    let displacementTexture: THREE.Texture | null = null;
 
-    const loadTexture = () =>
+    const loadTextures = () =>
       new Promise<void>((resolve) => {
-        textureLoader.load(
-          '/textures/anthracite.png',
-          (t) => {
-            console.log('Texture loaded:', t.image?.src || t);
-            if ('colorSpace' in t) (t as any).colorSpace = THREE.SRGBColorSpace;
-            else if ('encoding' in t) (t as any).encoding = THREE.sRGBEncoding;
-            t.wrapS = t.wrapT = THREE.RepeatWrapping;
-            t.repeat.set(2, 2);
-            t.needsUpdate = true;
-            texture = t;
-            resolve();
-          },
-          undefined,
-          (err) => {
-            console.error('Texture load error:', err);
-            texture = null;
+        let loadedCount = 0;
+        const totalTextures = 4;
+        
+        const checkComplete = () => {
+          loadedCount++;
+          if (loadedCount >= totalTextures) {
+            console.log('All textures loaded successfully');
             resolve();
           }
+        };
+
+        const handleError = (textureType: string) => (err: any) => {
+          console.warn(`${textureType} texture load error:`, err);
+          checkComplete();
+        };
+
+        // Load Diffuse (Albedo) texture
+        textureLoader.load(
+          '/textures/anthracite-diff.jpg',
+          (texture) => {
+            console.log('Diffuse texture loaded');
+            if ('colorSpace' in texture) (texture as any).colorSpace = THREE.SRGBColorSpace;
+            else if ('encoding' in texture) (texture as any).encoding = THREE.sRGBEncoding;
+            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(2, 2);
+            texture.needsUpdate = true;
+            diffuseTexture = texture;
+            checkComplete();
+          },
+          undefined,
+          handleError('Diffuse')
+        );
+
+        // Load Normal texture
+        if (exrLoader) {
+          exrLoader.load(
+            '/textures/anthracite-normal.exr',
+            (texture: THREE.Texture) => {
+              console.log('Normal texture loaded');
+              texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+              texture.repeat.set(2, 2);
+              texture.needsUpdate = true;
+              normalTexture = texture;
+              checkComplete();
+            },
+            undefined,
+            handleError('Normal')
+          );
+        } else {
+          // Fallback: try loading as regular texture
+          textureLoader.load(
+            '/textures/anthracite-normal.exr',
+            (texture) => {
+              console.log('Normal texture loaded (fallback)');
+              texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+              texture.repeat.set(2, 2);
+              texture.needsUpdate = true;
+              normalTexture = texture;
+              checkComplete();
+            },
+            undefined,
+            handleError('Normal')
+          );
+        }
+
+        // Load Roughness texture
+        if (exrLoader) {
+          exrLoader.load(
+            '/textures/anthracite-roughness.exr',
+            (texture: THREE.Texture) => {
+              console.log('Roughness texture loaded');
+              texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+              texture.repeat.set(2, 2);
+              texture.needsUpdate = true;
+              roughnessTexture = texture;
+              checkComplete();
+            },
+            undefined,
+            handleError('Roughness')
+          );
+        } else {
+          console.warn('EXR loader not available, skipping roughness texture');
+          checkComplete();
+        }
+
+        // Load Displacement texture
+        textureLoader.load(
+          '/textures/anthracite-disp.png',
+          (texture) => {
+            console.log('Displacement texture loaded');
+            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(2, 2);
+            texture.needsUpdate = true;
+            displacementTexture = texture;
+            checkComplete();
+          },
+          undefined,
+          handleError('Displacement')
         );
       });
 
     const loadModel = async () => {
       try {
-        await loadTexture();
+        await loadTextures();
 
         const gltf = await new Promise<any>((resolve, reject) => {
           loader.load('/models/ashtray.glb', resolve, undefined, reject);
@@ -257,7 +371,28 @@ const Floating3DObjects: React.FC = () => {
           transparent: true,
           opacity: 0
         };
-        if (texture) baseMaterialParams.map = texture;
+
+        // Apply PBR textures if loaded
+        if (diffuseTexture) {
+          baseMaterialParams.map = diffuseTexture;
+          console.log('Applied diffuse texture');
+        }
+        if (normalTexture) {
+          baseMaterialParams.normalMap = normalTexture;
+          baseMaterialParams.normalScale = new THREE.Vector2(1.0, 1.0);
+          console.log('Applied normal texture');
+        }
+        if (roughnessTexture) {
+          baseMaterialParams.roughnessMap = roughnessTexture;
+          baseMaterialParams.roughness = 1.0; // Let the texture control roughness
+          console.log('Applied roughness texture');
+        }
+        if (displacementTexture) {
+          baseMaterialParams.displacementMap = displacementTexture;
+          baseMaterialParams.displacementScale = isMobile ? 0.05 : 0.1; // Subtle displacement
+          console.log('Applied displacement texture');
+        }
+
         const templateMaterial = new THREE.MeshStandardMaterial(baseMaterialParams);
 
         ashtray.traverse((child) => {
