@@ -173,8 +173,8 @@ const Floating3DObjects: React.FC = () => {
       return particleConfigs.map((config, index) => {
         const blobGeometry = createBlobGeometry(config.size, isMobile ? 4 : 6);
         const particleMaterial = baseMaterial.clone();
-        particleMaterial.transparent = true;
-        particleMaterial.opacity = isMobile ? 0.6 : 0.7;
+        particleMaterial.transparent = false; // Remove transparency
+        particleMaterial.opacity = 1.0; // Full opacity
         particleMaterial.roughness = 0.9;
         particleMaterial.metalness = 0.02;
         
@@ -367,7 +367,7 @@ const Floating3DObjects: React.FC = () => {
 
         // Ensure proper material properties for concrete look
         baseMaterialParams.metalness = 0.0; // Concrete is not metallic
-        baseMaterialParams.color = new THREE.Color('#6b6b6b'); // Lighter gray base color
+        baseMaterialParams.color = new THREE.Color('#8a8a8a'); // Lighter, clearer gray base color
 
         const templateMaterial = new THREE.MeshStandardMaterial(baseMaterialParams);
 
@@ -418,7 +418,8 @@ const Floating3DObjects: React.FC = () => {
             const particleEased = 1 - Math.pow(1 - particleP, 3);
             
             const mat = (particle as THREE.Mesh).material as THREE.MeshStandardMaterial;
-            mat.opacity = particleEased * (isMobile ? 0.6 : 0.7);
+            // Particles fade in to full opacity (no transparency)
+            mat.opacity = particleEased;
           });
           
           if (p < 1) requestAnimationFrame(fadeIn);
@@ -432,8 +433,8 @@ const Floating3DObjects: React.FC = () => {
             });
             particles.forEach(particle => {
               const mat = (particle as THREE.Mesh).material as THREE.MeshStandardMaterial;
-              mat.transparent = true;
-              mat.opacity = isMobile ? 0.6 : 0.7;
+              mat.transparent = false; // No transparency after fade-in
+              mat.opacity = 1.0; // Full opacity
             });
           }
         };
