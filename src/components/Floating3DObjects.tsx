@@ -127,6 +127,86 @@ const Floating3DObjects: React.FC = () => {
     const loader = new GLTFLoader();
     let ashtray: THREE.Object3D | null = null;
     let hoveredObject: THREE.Object3D | null = null;
+    let particles: THREE.Object3D[] = [];
+
+    // ---- Create Organic Blob Particles ----
+    const createBlobGeometry = (size: number, complexity: number = 6) => {
+      const geometry = new THREE.SphereGeometry(size, complexity * 2, complexity);
+      const vertices = geometry.attributes.position.array;
+      
+      // Deform sphere to create organic blob shape
+      for (let i = 0; i < vertices.length; i += 3) {
+        const x = vertices[i];
+        const y = vertices[i + 1];
+        const z = vertices[i + 2];
+        
+        // Apply noise-like deformation
+        const noise1 = Math.sin(x * 3 + y * 2) * Math.cos(z * 2.5) * 0.3;
+        const noise2 = Math.cos(x * 2.5 + z * 3) * Math.sin(y * 1.8) * 0.25;
+        const noise3 = Math.sin(x * 1.5 + y * 2.8 + z * 2.2) * 0.2;
+        
+        const deformation = (noise1 + noise2 + noise3) * size * 0.4;
+        const length = Math.sqrt(x * x + y * y + z * z);
+        const scale = (length + deformation) / length;
+        
+        vertices[i] = x * scale;
+        vertices[i + 1] = y * scale;
+        vertices[i + 2] = z * scale;
+      }
+      
+      geometry.attributes.position.needsUpdate = true;
+      geometry.computeVertexNormals();
+      return geometry;
+    };
+
+    const createParticles = (baseMaterial: THREE.MeshStandardMaterial) => {
+      const particleConfigs = [
+        // 2 small particles
+        { size: 0.8, distance: 12, speed: 0.015, offsetY: 2, eccentricity: 0.7 },
+        { size: 0.6, distance: 15, speed: -0.012, offsetY: -3, eccentricity: 0.8 },
+        // 1 medium particle
+        { size: 1.4, distance: 18, speed: 0.008, offsetY: 1, eccentricity: 0.6 },
+        // 1 large particle
+        { size: 2.2, distance: 22, speed: -0.006, offsetY: -1.5, eccentricity: 0.9 }
+      ];
+
+      return particleConfigs.map((config, index) => {
+        const blobGeometry = createBlobGeometry(config.size, isMobile ? 4 : 6);
+        const particleMaterial = baseMaterial.clone();
+        particleMaterial.transparent = true;
+        particleMaterial.opacity = isMobile ? 0.6 : 0.7;
+        particleMaterial.roughness = 0.9;
+        particleMaterial.metalness = 0.02;
+        
+        const particle = new THREE.Mesh(blobGeometry, particleMaterial);
+        
+        // Set initial position
+        const angle = (index / particleConfigs.length) * Math.PI * 2;
+        particle.position.x = Math.cos(angle) * config.distance;
+        particle.position.z = Math.sin(angle) * config.distance * config.eccentricity;
+        particle.position.y = config.offsetY;
+        
+        // Store animation properties
+        (particle as any).orbitProps = {
+          distance: config.distance,
+          speed: config.speed,
+          baseY: config.offsetY,
+          eccentricity: config.eccentricity,
+          angleOffset: angle,
+          currentAngle: angle,
+          bobSpeed: (Math.random() - 0.5) * 0.02,
+          bobAmplitude: 0.5 + Math.random() * 0.5
+        };
+        
+        if (!isMobile) {
+          particle.castShadow = true;
+          particle.receiveShadow = true;
+        }
+        
+        scene.add(particle);
+        return particle;
+      });
+    };
 
     // ---- Texture Handling ----
     const COLOR_HEX = '#525350';
@@ -199,6 +279,9 @@ const Floating3DObjects: React.FC = () => {
 
         scene.add(ashtray);
 
+        // Create particles after ashtray is loaded
+        particles = createParticles(templateMaterial);
+
         // Fade-in
         const startTime = Date.now();
         const fadeDuration = isMobile ? 600 : 800;
@@ -207,12 +290,26 @@ const Floating3DObjects: React.FC = () => {
           const elapsed = Date.now() - startTime;
           const p = Math.min(elapsed / fadeDuration, 1);
           const eased = 1 - Math.pow(1 - p, 3);
+          
+          // Fade in ashtray
           ashtray.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
               const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
               mat.opacity = eased;
             }
           });
+          
+          // Fade in particles with slight delay
+          particles.forEach((particle, index) => {
+            const particleDelay = index * 200;
+            const particleElapsed = Math.max(0, elapsed - particleDelay);
+            const particleP = Math.min(particleElapsed / fadeDuration, 1);
+            const particleEased = 1 - Math.pow(1 - particleP, 3);
+            
+            const mat = (particle as THREE.Mesh).material as THREE.MeshStandardMaterial;
+            mat.opacity = particleEased * (isMobile ? 0.6 : 0.7);
+          });
+          
           if (p < 1) requestAnimationFrame(fadeIn);
           else {
             ashtray.traverse((child) => {
@@ -221,6 +318,11 @@ const Floating3DObjects: React.FC = () => {
                 mat.transparent = false;
                 mat.opacity = 1;
               }
+            });
+            particles.forEach(particle => {
+              const mat = (particle as THREE.Mesh).material as THREE.MeshStandardMaterial;
+              mat.transparent = true;
+              mat.opacity = isMobile ? 0.6 : 0.7;
             });
           }
         };
@@ -262,14 +364,15 @@ const Floating3DObjects: React.FC = () => {
       if (!isMobile || isTouch) {
         if (ashtray) {
           raycaster.setFromCamera(mouse, camera);
-          const intersects = raycaster.intersectObjects([ashtray], true);
+          const allObjects = [ashtray, ...particles];
+          const intersects = raycaster.intersectObjects(allObjects, true);
           hoveredObject = null;
           if (intersects.length > 0) {
             let newHovered = intersects[0].object;
             while (newHovered.parent && newHovered.parent !== scene) {
               newHovered = newHovered.parent;
             }
-            if (newHovered === ashtray) hoveredObject = newHovered;
+            if (allObjects.includes(newHovered)) hoveredObject = newHovered;
           }
         }
       }
@@ -315,6 +418,41 @@ const Floating3DObjects: React.FC = () => {
           ashtray.rotation.y += (targetRot.y - ashtray.rotation.y) * rotSpeed;
         }
       }
+
+      // Animate particles
+      particles.forEach((particle, index) => {
+        const props = (particle as any).orbitProps;
+        if (!props) return;
+
+        // Update orbital angle
+        props.currentAngle += props.speed;
+
+        // Calculate asymmetrical orbital position
+        const x = Math.cos(props.currentAngle) * props.distance;
+        const z = Math.sin(props.currentAngle) * props.distance * props.eccentricity;
+        
+        // Add vertical bobbing motion
+        const bobOffset = Math.sin(time * 0.001 * (1 + index * 0.3)) * props.bobAmplitude;
+        const y = props.baseY + bobOffset;
+
+        // Smooth particle movement
+        particle.position.x += (x - particle.position.x) * 0.02;
+        particle.position.z += (z - particle.position.z) * 0.02;
+        particle.position.y += (y - particle.position.y) * 0.03;
+
+        // Subtle rotation for organic feel
+        if (particles.indexOf(particle) !== hoveredObject) {
+          particle.rotation.x += 0.005 + index * 0.001;
+          particle.rotation.y += 0.007 - index * 0.0015;
+          particle.rotation.z += 0.003 + index * 0.002;
+        }
+
+        // Scale effect on hover
+        const targetScale = particle === hoveredObject ? 1.1 : 1.0;
+        const currentScale = particle.scale.x;
+        const newScale = currentScale + (targetScale - currentScale) * 0.1;
+        particle.scale.setScalar(newScale);
+      });
 
       renderer.render(scene, camera);
     };
@@ -368,6 +506,17 @@ const Floating3DObjects: React.FC = () => {
           }
         });
       }
+
+      // Cleanup particles
+      particles.forEach(particle => {
+        if ((particle as THREE.Mesh).isMesh) {
+          const mesh = particle as THREE.Mesh;
+          mesh.geometry.dispose();
+          if (Array.isArray(mesh.material)) mesh.material.forEach((m) => m.dispose());
+          else mesh.material.dispose();
+        }
+        scene.remove(particle);
+      });
 
       if (mountRef.current && renderer.domElement) {
         mountRef.current.removeChild(renderer.domElement);
