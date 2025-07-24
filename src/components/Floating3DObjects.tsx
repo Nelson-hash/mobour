@@ -190,7 +190,7 @@ const Floating3DObjects: React.FC = () => {
           particleNormal.repeat.set(1, 1);
           particleNormal.needsUpdate = true;
           particleMaterial.normalMap = particleNormal;
-          particleMaterial.normalScale = new THREE.Vector2(0.15, 0.15); // Very subtle normal for particles
+          particleMaterial.normalScale = new THREE.Vector2(0.05, 0.05); // Extremely subtle normal for particles
         }
         if (roughnessTexture) {
           const particleRoughness = roughnessTexture.clone();
@@ -348,21 +348,21 @@ const Floating3DObjects: React.FC = () => {
         }
         if (normalTexture) {
           baseMaterialParams.normalMap = normalTexture;
-          // Reduce normal intensity significantly
-          baseMaterialParams.normalScale = new THREE.Vector2(0.3, 0.3);
-          console.log('Applied normal texture');
+          // Much more subtle normal intensity to avoid cracks
+          baseMaterialParams.normalScale = new THREE.Vector2(0.1, 0.1);
+          console.log('Applied normal texture with very low intensity');
         }
         if (roughnessTexture) {
           baseMaterialParams.roughnessMap = roughnessTexture;
           // Lower base roughness when using roughness map
-          baseMaterialParams.roughness = 0.6;
+          baseMaterialParams.roughness = 0.7;
           console.log('Applied roughness texture');
         }
         if (displacementTexture) {
-          baseMaterialParams.displacementMap = displacementTexture;
-          // Much more subtle displacement
-          baseMaterialParams.displacementScale = isMobile ? 0.01 : 0.02;
-          console.log('Applied displacement texture');
+          // Disable displacement for now to avoid geometry issues
+          // baseMaterialParams.displacementMap = displacementTexture;
+          // baseMaterialParams.displacementScale = isMobile ? 0.01 : 0.02;
+          console.log('Displacement texture loaded but disabled to avoid artifacts');
         }
 
         // Ensure proper material properties for concrete look
