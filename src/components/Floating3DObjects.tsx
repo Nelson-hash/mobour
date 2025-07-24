@@ -155,35 +155,15 @@ const Floating3DObjects: React.FC = () => {
         // Clone the original ashtray
         const miniAshtray = originalAshtray.clone();
         
-        // Apply materials to all meshes in the mini ashtray
-        miniAshtray.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            const mesh = child as THREE.Mesh;
-            const particleMaterial = baseMaterial.clone();
-            particleMaterial.transparent = false;
-            particleMaterial.opacity = 1.0;
-            mesh.material = particleMaterial;
-            if (!isMobile) {
-              mesh.castShadow = true;
-              mesh.receiveShadow = true;
-            }
-          }
-        });
-        
-        // Scale the mini ashtray
-        const scaleMultiplier = config.size * 0.3;
-        miniAshtray.scale.setScalar(getScale() * scaleMultiplier);
-        
         // Set initial position
         const angle = (index / particleConfigs.length) * Math.PI * 2;
         miniAshtray.position.x = Math.cos(angle) * config.distance;
         miniAshtray.position.z = Math.sin(angle) * config.distance * config.eccentricity;
         miniAshtray.position.y = config.offsetY;
         
-        // Add random rotation
-        miniAshtray.rotation.x = Math.random() * Math.PI;
-        miniAshtray.rotation.y = Math.random() * Math.PI * 2;
-        miniAshtray.rotation.z = Math.random() * Math.PI;
+        // Scale the mini ashtray
+        const scaleMultiplier = config.size * 0.3;
+        miniAshtray.scale.setScalar(getScale() * scaleMultiplier);
         
         // Store animation properties
         (miniAshtray as any).orbitProps = {
@@ -194,12 +174,7 @@ const Floating3DObjects: React.FC = () => {
           angleOffset: angle,
           currentAngle: angle,
           bobSpeed: (Math.random() - 0.5) * 0.02,
-          bobAmplitude: 0.5 + Math.random() * 0.5,
-          rotationSpeed: {
-            x: (Math.random() - 0.5) * 0.01,
-            y: (Math.random() - 0.5) * 0.01,
-            z: (Math.random() - 0.5) * 0.01
-          }
+          bobAmplitude: 0.5 + Math.random() * 0.5
         };
         
         scene.add(miniAshtray);
@@ -532,10 +507,9 @@ const Floating3DObjects: React.FC = () => {
 
         // Subtle rotation for organic feel
         if (particles.indexOf(particle) !== hoveredObject) {
-          const rotSpeed = (particle as any).orbitProps.rotationSpeed;
-          particle.rotation.x += rotSpeed.x;
-          particle.rotation.y += rotSpeed.y;
-          particle.rotation.z += rotSpeed.z;
+          particle.rotation.x += 0.005 + index * 0.001;
+          particle.rotation.y += 0.007 - index * 0.0015;
+          particle.rotation.z += 0.003 + index * 0.002;
         }
 
         // Scale effect on hover
