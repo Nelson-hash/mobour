@@ -46,64 +46,59 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
           </div>
 
           {/* Centered Logo - Made bigger and higher */}
-          <div className="absolute left-1/2 transform -translate-x-1/2 -translate-y-2">
-            <div 
-              className="cursor-pointer hover:opacity-75 transition-opacity"
+          <div className="absolute left-1/2 transform -translate-x-1/2 -translate-y-4">
+            <img
+              src="/logo.svg"
+              alt="MOBOUR"
+              className="h-16 sm:h-20 w-auto cursor-pointer hover:opacity-75 transition-opacity bg-transparent"
+              style={{ mixBlendMode: 'multiply' }}
               onClick={handleLogoClick}
-            >
-              <img 
-                src="/logo.svg" 
-                alt="MOBOUR" 
-                className="h-16 sm:h-20 w-auto"
-                style={{ 
-                  background: 'transparent',
-                  mixBlendMode: 'multiply' 
-                }}
-                loading="eager"
-              />
-            </div>
+              loading="eager"
+            />
           </div>
 
-          {/* Burger Menu Button - Right - Made bigger */}
-          <button
-            onClick={handleMenuToggle}
-            className="p-3 hover:bg-gray-100 rounded-full transition-colors"
-            aria-label={isMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
-            aria-expanded={isMenuOpen}
-          >
-            {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          {/* Burger menu with proper dropdown positioning */}
+          <div className="relative">
+            <button
+              onClick={handleMenuToggle}
+              className="p-3 hover:bg-gray-100 rounded-full transition-colors"
+              aria-label={isMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+              aria-expanded={isMenuOpen}
+            >
+              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+
+            {/* Dropdown positioned relative to burger button */}
+            {isMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                <nav className="p-2 space-y-1" role="navigation">
+                  {menuItems.map((item) => (
+                    <button
+                      key={item.page}
+                      onClick={() => handleMenuItemClick(item.page)}
+                      className={`flex items-center justify-between w-full px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                        currentPage === item.page 
+                          ? 'bg-gray-100 text-gray-900' 
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                    >
+                      <span>{item.label}</span>
+                      {item.page === 'cart' && !isLoading && totalItems > 0 && (
+                        <span 
+                          className="bg-gray-900 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+                          aria-label={`${totalItems} article${totalItems > 1 ? 's' : ''} dans le panier`}
+                        >
+                          {totalItems > 99 ? '99+' : totalItems}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </nav>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-
-      {/* Mobile Menu - Compact dropdown directly under button */}
-      {isMenuOpen && (
-        <div className="absolute top-full right-0 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-          <nav className="p-2 space-y-1" role="navigation">
-            {menuItems.map((item) => (
-              <button
-                key={item.page}
-                onClick={() => handleMenuItemClick(item.page)}
-                className={`flex items-center justify-between w-full px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  currentPage === item.page 
-                    ? 'bg-gray-100 text-gray-900' 
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-              >
-                <span>{item.label}</span>
-                {item.page === 'cart' && !isLoading && totalItems > 0 && (
-                  <span 
-                    className="bg-gray-900 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
-                    aria-label={`${totalItems} article${totalItems > 1 ? 's' : ''} dans le panier`}
-                  >
-                    {totalItems > 99 ? '99+' : totalItems}
-                  </span>
-                )}
-              </button>
-            ))}
-          </nav>
-        </div>
-      )}
     </header>
   );
 };
