@@ -1,12 +1,11 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 
-// Import GLTFLoader from the CDN-hosted examples
+// Import GLTFLoader from the CDN-hosted examples (same fallback as before)
 const GLTFLoader = (() => {
   if (typeof window !== 'undefined' && (window as any).THREE) {
     return (window as any).THREE.GLTFLoader;
   }
-  
   class GLTFLoader {
     load(
       url: string,
@@ -21,7 +20,6 @@ const GLTFLoader = (() => {
         })
         .catch((importError) => {
           console.warn('Could not import GLTFLoader, creating geometric fallback:', importError);
-          
           const scene = this.createGeometricAshtray();
           onLoad({ scene });
         });
@@ -29,29 +27,18 @@ const GLTFLoader = (() => {
     
     createGeometricAshtray() {
       const group = new THREE.Group();
-      
-      // Main body - cylinder
       const bodyGeometry = new THREE.CylinderGeometry(2, 2.5, 0.5, 32);
-      const bodyMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0xf8f8f8,
-        shininess: 15,
-        specular: 0x888888
-      });
+      const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0xf8f8f8, shininess: 15, specular: 0x888888 });
       const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
       body.position.y = 0.25;
       group.add(body);
-      
-      // Inner depression
+
       const innerGeometry = new THREE.CylinderGeometry(1.5, 1.8, 0.3, 32);
-      const innerMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0xe8e8e8,
-        shininess: 10
-      });
+      const innerMaterial = new THREE.MeshPhongMaterial({ color: 0xe8e8e8, shininess: 10 });
       const inner = new THREE.Mesh(innerGeometry, innerMaterial);
       inner.position.y = 0.35;
       group.add(inner);
       
-      // Notches
       for (let i = 0; i < 3; i++) {
         const notchGeometry = new THREE.BoxGeometry(0.3, 0.2, 0.1);
         const notch = new THREE.Mesh(notchGeometry, bodyMaterial.clone());
@@ -61,20 +48,17 @@ const GLTFLoader = (() => {
         notch.position.y = 0.4;
         group.add(notch);
       }
-      
       return group;
     }
   }
-  
   return GLTFLoader;
 })();
 
 const Floating3DObjects: React.FC = () => {
   const mountRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const animationIdRef = useRef<number>();
-  
+
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -82,57 +66,66 @@ const Floating3DObjects: React.FC = () => {
   useEffect(() => {
     if (!mountRef.current) return;
 
-    // --- Helpers ---
+    // ---------- Helpers ----------
     const isMobileScreen = () => window.innerWidth < 768;
+    const SCALE_FACTOR = 0.512; // 0.8 * 0.8 = 0.64, then again 0.8 => 0.512 total
     const getScale = () => {
       const BASE_MOBILE = 15.0;
       const BASE_DESKTOP = 24.0;
-    return (isMobileScreen() ? BASE_MOBILE : BASE_DESKTOP) * 0.64; // 36% of original reduction
+      return (isMobileScreen() ? BASE_MOBILE : BASE_DESKTOP) * SCALE_FACTOR;
     };
 
-
-    // Detect mobile/tablet
-    const checkMobile = () => {
-      setIsMobile(isMobileScreen());
-    };
+    const checkMobile = () => setIsMobile(isMobileScreen());
     checkMobile();
     window.addEventListener('resize', checkMobile);
 
-    // Scene setup
+    // ---------- Scene / Camera / Renderer ----------
     const scene = new THREE.Scene();
-    sceneRef.current = scene;
-    
+
     const camera = new THREE.PerspectiveCamera(
       isMobile ? 85 : 75,
       window.innerWidth / window.innerHeight,
       0.1,
       1000
     );
-    
-    const renderer = new THREE.WebGLRenderer({ 
-      antialias: true, 
+    const getCameraDistance = () => {
+      if (window.innerWidth < 480) return 45;
+      if (window.innerWidth < 768) return 40;
+      if (window.innerWidth < 1024) return 35;
+      return 30;
+    };
+    camera.position.z = getCameraDistance();
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
       alpha: true,
       powerPreference: 'high-performance'
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setClearColor(0x000000, 0);
+
+    // Output color space (Three r152+)
+    (renderer as any).outputColorSpace = THREE.SRGBColorSpace ?? undefined;
+    // For older versions:
+    if ((renderer as any).outputEncoding !== undefined) {
+      (renderer as any).outputEncoding = THREE.sRGBEncoding;
+    }
+
     renderer.shadowMap.enabled = !isMobile;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
-    
     mountRef.current.appendChild(renderer.domElement);
 
-    // Lighting
+    // ---------- Lights ----------
     const ambientLight = new THREE.AmbientLight(0xf0f0f0, isMobile ? 0.8 : 0.7);
     scene.add(ambientLight);
-    
+
     const directionalLight = new THREE.DirectionalLight(0xffffff, isMobile ? 1.0 : 1.2);
     directionalLight.position.set(15, 15, 10);
     if (!isMobile) {
       directionalLight.castShadow = true;
-      directionalLight.shadow.mapSize.width = 1024;
-      directionalLight.shadow.mapSize.height = 1024;
+      directionalLight.shadow.mapSize.set(1024, 1024);
     }
     scene.add(directionalLight);
 
@@ -144,65 +137,73 @@ const Floating3DObjects: React.FC = () => {
     accentLight.position.set(0, 10, 0);
     scene.add(accentLight);
 
-    // Camera distance
-    const getCameraDistance = () => {
-      if (window.innerWidth < 480) return 45;
-      if (window.innerWidth < 768) return 40;
-      if (window.innerWidth < 1024) return 35;
-      return 30;
-    };
-    camera.position.z = getCameraDistance();
-
-    // GLTF loader & model
+    // ---------- Model ----------
     const loader = new GLTFLoader();
     let ashtray: THREE.Object3D | null = null;
     let hoveredObject: THREE.Object3D | null = null;
 
+    // Prepare texture and fallback color
+    const COLOR_HEX = '#525350';
+    const textureLoader = new THREE.TextureLoader();
+    let texture: THREE.Texture | null = null;
+
+    const tryLoadTexture = (): Promise<void> =>
+      new Promise((resolve) => {
+        textureLoader.load(
+          '/textures/anthracite.png',
+          (t) => {
+            t.wrapS = t.wrapT = THREE.RepeatWrapping;
+            t.repeat.set(2, 2);
+            // Newer three:
+            (t as any).colorSpace = THREE.SRGBColorSpace ?? undefined;
+            // Older three:
+            if ((t as any).encoding !== undefined) (t as any).encoding = THREE.sRGBEncoding;
+            texture = t;
+            resolve();
+          },
+          undefined,
+          () => {
+            texture = null;
+            resolve();
+          }
+        );
+      });
+
     const loadModel = async () => {
       try {
+        await tryLoadTexture();
+
         const gltf = await new Promise<any>((resolve, reject) => {
-          loader.load(
-            '/models/ashtray.glb',
-            resolve,
-            undefined,
-            reject
-          );
+          loader.load('/models/ashtray.glb', resolve, undefined, reject);
         });
 
-        const originalModel = gltf.scene;
-        ashtray = originalModel.clone();
-
+        ashtray = gltf.scene.clone();
         ashtray.position.set(0, 0, 0);
         ashtray.rotation.set(0.3, 1.2, -0.1);
-
-        // 20% reduction done inside getScale()
         ashtray.scale.setScalar(getScale());
 
-        // Material
-        const anthraciteMaterial = new THREE.MeshPhongMaterial({ 
-          color: 0x2c2c2c,
-          shininess: 8,
-          specular: 0x404040,
+        const baseMaterialParams: THREE.MeshStandardMaterialParameters = {
+          color: COLOR_HEX,
+          roughness: 0.8,
+          metalness: 0.05,
           transparent: true,
           opacity: 0
-        });
+        };
+
+        if (texture) baseMaterialParams.map = texture;
+
+        const templateMaterial = new THREE.MeshStandardMaterial(baseMaterialParams);
 
         ashtray.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
-            mesh.material = anthraciteMaterial.clone();
+            mesh.material = templateMaterial.clone();
             if (!isMobile) {
               mesh.castShadow = true;
               mesh.receiveShadow = true;
             }
           }
         });
-
-        (ashtray as any).originalRotation = {
-          x: ashtray.rotation.x,
-          y: ashtray.rotation.y,
-          z: ashtray.rotation.z
-        };
 
         (ashtray as any).spinSpeed = {
           x: (Math.random() - 0.5) * (isMobile ? 0.015 : 0.02),
@@ -212,54 +213,51 @@ const Floating3DObjects: React.FC = () => {
 
         scene.add(ashtray);
 
-        // Fade-in
-        const startTime = Date.now();
+        // Fade in
+        const start = Date.now();
         const fadeDuration = isMobile ? 600 : 800;
-
         const fadeIn = () => {
-          const elapsed = Date.now() - startTime;
-          const progress = Math.min(elapsed / fadeDuration, 1);
-          const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-          const eased = easeOutCubic(progress);
-
-          ashtray!.traverse((child) => {
+          if (!ashtray) return;
+          const elapsed = Date.now() - start;
+          const p = Math.min(elapsed / fadeDuration, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          ashtray.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
-              const mat = (child as THREE.Mesh).material as THREE.MeshPhongMaterial;
+              const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
               mat.opacity = eased;
             }
           });
-
-          if (progress < 1) {
-            requestAnimationFrame(fadeIn);
-          } else {
-            ashtray!.traverse((child) => {
+          if (p < 1) requestAnimationFrame(fadeIn);
+          else {
+            ashtray.traverse((child) => {
               if ((child as THREE.Mesh).isMesh) {
-                const mat = (child as THREE.Mesh).material as THREE.MeshPhongMaterial;
+                const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
                 mat.transparent = false;
                 mat.opacity = 1;
               }
             });
           }
         };
-
         fadeIn();
+
         setIsLoaded(true);
       } catch (err) {
         console.error('Failed to load GLTF model:', err);
-        setError('Model loading failed. Please ensure /models/ashtray.glb exists in your public folder.');
+        setError('Model loading failed. Please ensure /models/ashtray.glb exists.');
       }
     };
 
     loadModel();
 
-    // Raycasting & pointer events
+    // ---------- Interaction ----------
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
     let isTouch = false;
 
     const onPointerMove = (event: MouseEvent | TouchEvent) => {
-      let clientX: number | undefined, clientY: number | undefined;
-      
+      let clientX: number | undefined;
+      let clientY: number | undefined;
+
       if ('touches' in event && event.touches.length > 0) {
         clientX = event.touches[0].clientX;
         clientY = event.touches[0].clientY;
@@ -279,16 +277,13 @@ const Floating3DObjects: React.FC = () => {
         if (ashtray) {
           raycaster.setFromCamera(mouse, camera);
           const intersects = raycaster.intersectObjects([ashtray], true);
-
           hoveredObject = null;
           if (intersects.length > 0) {
             let newHovered = intersects[0].object;
             while (newHovered.parent && newHovered.parent !== scene) {
               newHovered = newHovered.parent;
             }
-            if (newHovered === ashtray) {
-              hoveredObject = newHovered;
-            }
+            if (newHovered === ashtray) hoveredObject = newHovered;
           }
         }
       }
@@ -296,64 +291,53 @@ const Floating3DObjects: React.FC = () => {
 
     window.addEventListener('mousemove', onPointerMove);
     window.addEventListener('touchmove', onPointerMove, { passive: true });
-
     const onTouchEnd = () => {
       hoveredObject = null;
       isTouch = false;
     };
     window.addEventListener('touchend', onTouchEnd);
 
-    // Animation loop (throttled on mobile)
+    // ---------- Animate ----------
     let lastTime = 0;
     const targetFPS = isMobile ? 30 : 60;
-    const interval = 1000 / targetFPS;
+    const frameInterval = 1000 / targetFPS;
 
     const animate = (currentTime: number) => {
       animationIdRef.current = requestAnimationFrame(animate);
-
-      if (isMobile && currentTime - lastTime < interval) {
-        return;
-      }
+      if (isMobile && currentTime - lastTime < frameInterval) return;
       lastTime = currentTime;
 
       if (ashtray) {
-        const spinSpeed = (ashtray as any).spinSpeed;
-
+        const spin = (ashtray as any).spinSpeed;
         if (ashtray !== hoveredObject) {
-          ashtray.rotation.x += spinSpeed.x;
-          ashtray.rotation.y += spinSpeed.y;
-          ashtray.rotation.z += spinSpeed.z;
+          ashtray.rotation.x += spin.x;
+          ashtray.rotation.y += spin.y;
+          ashtray.rotation.z += spin.z;
         } else {
-          const hoverDamping = isMobile ? 0.2 : 0.3;
-          ashtray.rotation.x += spinSpeed.x * hoverDamping;
-          ashtray.rotation.y += spinSpeed.y * hoverDamping;
-          ashtray.rotation.z += spinSpeed.z * hoverDamping;
-          
-          const mouseSensitivity = isMobile ? 10 : 15;
-          const mousePosition3D = new THREE.Vector3(mouse.x * mouseSensitivity, mouse.y * mouseSensitivity, 8);
-          const direction = new THREE.Vector3().subVectors(mousePosition3D, ashtray.position).normalize();
-          
-          const targetRotation = new THREE.Euler();
-          targetRotation.setFromQuaternion(
-            new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction)
-          );
-          
-          const rotationSpeed = isMobile ? 0.015 : 0.02;
-          ashtray.rotation.x += (targetRotation.x - ashtray.rotation.x) * rotationSpeed;
-          ashtray.rotation.y += (targetRotation.y - ashtray.rotation.y) * rotationSpeed;
+          const damping = isMobile ? 0.2 : 0.3;
+          ashtray.rotation.x += spin.x * damping;
+          ashtray.rotation.y += spin.y * damping;
+          ashtray.rotation.z += spin.z * damping;
+
+          const sensitivity = isMobile ? 10 : 15;
+          const mousePos3D = new THREE.Vector3(mouse.x * sensitivity, mouse.y * sensitivity, 8);
+          const dir = new THREE.Vector3().subVectors(mousePos3D, ashtray.position).normalize();
+          const targetRot = new THREE.Euler();
+          targetRot.setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir));
+          const rotSpeed = isMobile ? 0.015 : 0.02;
+          ashtray.rotation.x += (targetRot.x - ashtray.rotation.x) * rotSpeed;
+          ashtray.rotation.y += (targetRot.y - ashtray.rotation.y) * rotSpeed;
         }
       }
 
       renderer.render(scene, camera);
     };
-
     animate(0);
 
-    // Resize handling (also rescale the object)
+    // ---------- Resize ----------
     const handleResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
-
       camera.aspect = width / height;
       camera.fov = width < 768 ? 85 : 75;
       camera.position.z = getCameraDistance();
@@ -362,16 +346,12 @@ const Floating3DObjects: React.FC = () => {
       renderer.setSize(width, height);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-      // Update ashtray scale responsively
       if (ashtray) {
         ashtray.scale.setScalar(getScale());
       }
 
-      // Update mobile state
       const newIsMobile = isMobileScreen();
-      if (newIsMobile !== isMobile) {
-        setIsMobile(newIsMobile);
-      }
+      if (newIsMobile !== isMobile) setIsMobile(newIsMobile);
     };
 
     let resizeTimeout: ReturnType<typeof setTimeout>;
@@ -381,17 +361,15 @@ const Floating3DObjects: React.FC = () => {
     };
     window.addEventListener('resize', throttledResize);
 
-    // Cleanup
+    // ---------- Cleanup ----------
     return () => {
       window.removeEventListener('resize', throttledResize);
       window.removeEventListener('resize', checkMobile);
       window.removeEventListener('mousemove', onPointerMove);
       window.removeEventListener('touchmove', onPointerMove);
       window.removeEventListener('touchend', onTouchEnd);
-      
-      if (animationIdRef.current) {
-        cancelAnimationFrame(animationIdRef.current);
-      }
+
+      if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
       if (resizeTimeout) clearTimeout(resizeTimeout);
 
       if (ashtray) {
@@ -399,11 +377,8 @@ const Floating3DObjects: React.FC = () => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
             mesh.geometry.dispose();
-            if (Array.isArray(mesh.material)) {
-              mesh.material.forEach((mat) => mat.dispose());
-            } else {
-              mesh.material.dispose();
-            }
+            if (Array.isArray(mesh.material)) mesh.material.forEach((m) => m.dispose());
+            else mesh.material.dispose();
           }
         });
       }
@@ -411,7 +386,7 @@ const Floating3DObjects: React.FC = () => {
       if (mountRef.current && renderer.domElement) {
         mountRef.current.removeChild(renderer.domElement);
       }
-      
+
       renderer.dispose();
     };
   }, []);
