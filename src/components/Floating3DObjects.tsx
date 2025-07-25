@@ -50,7 +50,9 @@ const GLTFLoader = (() => {
 
 const Floating3DObjects: React.FC = () => {
   const mountRef = useRef<HTMLDivElement>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const sceneRef = useRef<THREE.Scene>();
+  const rendererRef = useRef<THREE.WebGLRenderer>();
+  const cameraRef = useRef<THREE.PerspectiveCamera>();
   const animationIdRef = useRef<number>();
 
   const [isLoaded, setIsLoaded] = useState(false);
@@ -68,34 +70,38 @@ const Floating3DObjects: React.FC = () => {
 
     const checkMobile = () => setIsMobile(isMobileScreen());
     checkMobile();
-    window.addEventListener('resize', checkMobile);
 
+    // Create scene
     const scene = new THREE.Scene();
+    sceneRef.current = scene;
 
+    // Create camera with FIXED position
     const camera = new THREE.PerspectiveCamera(
       isMobile ? 85 : 75,
       window.innerWidth / window.innerHeight,
       0.1,
       1000
     );
-
-    // FIXED: Store camera distance and never change it
-    const getCameraDistance = () => {
+    
+    // CRITICAL: Set ABSOLUTE camera position that never changes
+    const FIXED_CAMERA_Z = (() => {
       if (window.innerWidth < 480) return 45;
       if (window.innerWidth < 768) return 40;
       if (window.innerWidth < 1024) return 35;
       return 30;
-    };
+    })();
     
-    const FIXED_CAMERA_DISTANCE = getCameraDistance();
-    camera.position.set(0, 0, FIXED_CAMERA_DISTANCE);
+    camera.position.set(0, 0, FIXED_CAMERA_Z);
     camera.lookAt(0, 0, 0);
+    cameraRef.current = camera;
 
+    // Create renderer with FIXED positioning
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: true,
       powerPreference: 'high-performance'
     });
+    
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setClearColor(0x000000, 0);
@@ -109,17 +115,23 @@ const Floating3DObjects: React.FC = () => {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
     
-    // FIXED: Absolute positioning
-    renderer.domElement.style.position = 'fixed';
-    renderer.domElement.style.top = '0';
-    renderer.domElement.style.left = '0';
-    renderer.domElement.style.width = '100vw';
-    renderer.domElement.style.height = '100vh';
-    renderer.domElement.style.zIndex = '1';
-    renderer.domElement.style.pointerEvents = 'none';
+    // CRITICAL: Completely FIXED positioning - no relative positioning
+    const canvas = renderer.domElement;
+    canvas.style.position = 'fixed';
+    canvas.style.top = '0px';
+    canvas.style.left = '0px';
+    canvas.style.width = '100vw';
+    canvas.style.height = '100vh';
+    canvas.style.zIndex = '1';
+    canvas.style.pointerEvents = 'none';
+    canvas.style.transform = 'none'; // Ensure no transforms
+    canvas.style.margin = '0';
+    canvas.style.padding = '0';
     
-    mountRef.current.appendChild(renderer.domElement);
+    // Append directly to body to avoid any parent positioning issues
+    document.body.appendChild(canvas);
 
+    // Lighting
     const ambientLight = new THREE.AmbientLight(0xf0f0f0, isMobile ? 0.8 : 0.7);
     scene.add(ambientLight);
 
@@ -139,6 +151,7 @@ const Floating3DObjects: React.FC = () => {
     accentLight.position.set(0, 10, 0);
     scene.add(accentLight);
 
+    // Objects
     const loader = new GLTFLoader();
     let ashtray: THREE.Object3D | null = null;
     let hoveredObject: THREE.Object3D | null = null;
@@ -218,71 +231,38 @@ const Floating3DObjects: React.FC = () => {
       });
     };
 
-    // Texture Handling
-    const textureLoader = new THREE.TextureLoader();
-    textureLoader.setCrossOrigin('anonymous');
-    
-    let diffuseTexture: THREE.Texture | null = null;
-    let normalTexture: THREE.Texture | null = null;
-    let roughnessTexture: THREE.Texture | null = null;
-    let displacementTexture: THREE.Texture | null = null;
-
-    const loadTextures = () =>
-      new Promise<void>((resolve) => {
-        let loadedCount = 0;
-        const totalTextures = 4;
-        
-        const checkComplete = () => {
-          loadedCount++;
-          if (loadedCount >= totalTextures) {
-            resolve();
-          }
-        };
-
-        const handleError = (textureType: string) => (err: any) => {
-          console.warn(`${textureType} texture load error:`, err);
-          checkComplete();
-        };
-
-        textureLoader.load('/textures/anthracite-diff.jpg', (texture) => {
-          if ('colorSpace' in texture) (texture as any).colorSpace = THREE.SRGBColorSpace;
-          else if ('encoding' in texture) (texture as any).encoding = THREE.sRGBEncoding;
-          texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-          texture.repeat.set(2, 2);
-          texture.needsUpdate = true;
-          diffuseTexture = texture;
-          checkComplete();
-        }, undefined, handleError('Diffuse'));
-
-        textureLoader.load('/textures/anthracite-normal.exr', (texture) => {
-          texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-          texture.repeat.set(2, 2);
-          texture.needsUpdate = true;
-          normalTexture = texture;
-          checkComplete();
-        }, undefined, handleError('Normal'));
-
-        textureLoader.load('/textures/anthracite-roughness.exr', (texture) => {
-          texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-          texture.repeat.set(2, 2);
-          texture.needsUpdate = true;
-          roughnessTexture = texture;
-          checkComplete();
-        }, undefined, handleError('Roughness'));
-
-        textureLoader.load('/textures/anthracite-disp.png', (texture) => {
-          texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-          texture.repeat.set(2, 2);
-          texture.needsUpdate = true;
-          displacementTexture = texture;
-          checkComplete();
-        }, undefined, handleError('Displacement'));
-      });
-
+    // Load model and textures
     const loadModel = async () => {
       try {
-        await loadTextures();
+        const textureLoader = new THREE.TextureLoader();
+        textureLoader.setCrossOrigin('anonymous');
+        
+        // Load textures with error handling
+        const loadTexture = (url: string) => 
+          new Promise<THREE.Texture | null>((resolve) => {
+            textureLoader.load(
+              url, 
+              (texture) => {
+                if ('colorSpace' in texture) (texture as any).colorSpace = THREE.SRGBColorSpace;
+                else if ('encoding' in texture) (texture as any).encoding = THREE.sRGBEncoding;
+                texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+                texture.repeat.set(2, 2);
+                texture.needsUpdate = true;
+                resolve(texture);
+              },
+              undefined,
+              () => resolve(null)
+            );
+          });
 
+        const [diffuseTexture, normalTexture, roughnessTexture, displacementTexture] = await Promise.all([
+          loadTexture('/textures/anthracite-diff.jpg'),
+          loadTexture('/textures/anthracite-normal.exr'),
+          loadTexture('/textures/anthracite-roughness.exr'),
+          loadTexture('/textures/anthracite-disp.png')
+        ]);
+
+        // Load GLTF model
         const gltf = await new Promise<any>((resolve, reject) => {
           loader.load('/models/ashtray.glb', resolve, undefined, reject);
         });
@@ -329,7 +309,7 @@ const Floating3DObjects: React.FC = () => {
         scene.add(ashtray);
         particles = createParticles(templateMaterial);
 
-        // Fade-in
+        // Fade-in animation
         const startTime = Date.now();
         const fadeDuration = isMobile ? 600 : 800;
         const fadeIn = () => {
@@ -376,16 +356,15 @@ const Floating3DObjects: React.FC = () => {
         setIsLoaded(true);
       } catch (err) {
         console.error('Failed to load GLTF model:', err);
-        setError('Model loading failed. Check /models/ashtray.glb.');
+        setError('Model loading failed.');
       }
     };
 
     loadModel();
 
-    // FIXED: Mouse interaction
+    // Mouse interaction
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
-    let isTouch = false;
 
     const onPointerMove = (event: MouseEvent | TouchEvent) => {
       let clientX: number;
@@ -394,70 +373,42 @@ const Floating3DObjects: React.FC = () => {
       if ('touches' in event && event.touches.length > 0) {
         clientX = event.touches[0].clientX;
         clientY = event.touches[0].clientY;
-        isTouch = true;
       } else if ('clientX' in event) {
         clientX = event.clientX;
         clientY = event.clientY;
-        isTouch = false;
       } else {
         return;
       }
 
-      // FIXED: Simple viewport coordinates
       mouse.x = (clientX / window.innerWidth) * 2 - 1;
       mouse.y = -(clientY / window.innerHeight) * 2 + 1;
 
-      if (!isMobile || isTouch) {
-        if (ashtray) {
-          raycaster.setFromCamera(mouse, camera);
-          const allObjects = [ashtray, ...particles];
-          const intersects = raycaster.intersectObjects(allObjects, true);
-          hoveredObject = null;
-          if (intersects.length > 0) {
-            let newHovered = intersects[0].object;
-            while (newHovered.parent && newHovered.parent !== scene) {
-              newHovered = newHovered.parent;
-            }
-            if (allObjects.includes(newHovered)) hoveredObject = newHovered;
+      if (ashtray) {
+        raycaster.setFromCamera(mouse, camera);
+        const allObjects = [ashtray, ...particles];
+        const intersects = raycaster.intersectObjects(allObjects, true);
+        hoveredObject = null;
+        if (intersects.length > 0) {
+          let newHovered = intersects[0].object;
+          while (newHovered.parent && newHovered.parent !== scene) {
+            newHovered = newHovered.parent;
           }
+          if (allObjects.includes(newHovered)) hoveredObject = newHovered;
         }
       }
     };
 
     document.addEventListener('mousemove', onPointerMove);
     document.addEventListener('touchmove', onPointerMove, { passive: true });
-    
-    const onTouchEnd = () => {
-      hoveredObject = null;
-      isTouch = false;
-    };
-    document.addEventListener('touchend', onTouchEnd);
 
-    // FIXED: Animation loop with scroll protection
-    let isScrolling = false;
-    let scrollTimeout: ReturnType<typeof setTimeout>;
-
-    const scrollHandler = () => {
-      isScrolling = true;
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        isScrolling = false;
-      }, 50);
-    };
-
-    window.addEventListener('scroll', scrollHandler, { passive: true });
-
+    // Animation loop
     const animate = (time: number) => {
       animationIdRef.current = requestAnimationFrame(animate);
       
-      // CRITICAL: Force camera to stay in fixed position
-      camera.position.set(0, 0, FIXED_CAMERA_DISTANCE);
-      camera.lookAt(0, 0, 0);
-      
-      // EMERGENCY: Skip heavy calculations during scroll
-      if (isScrolling) {
-        renderer.render(scene, camera);
-        return;
+      // CRITICAL: Force camera to stay in ABSOLUTE position
+      if (camera) {
+        camera.position.set(0, 0, FIXED_CAMERA_Z);
+        camera.lookAt(0, 0, 0);
       }
 
       if (ashtray) {
@@ -468,19 +419,14 @@ const Floating3DObjects: React.FC = () => {
           ashtray.rotation.z += spin.z;
         } else {
           const damping = isMobile ? 0.2 : 0.3;
-          ashtray.rotation.x += spin.x * damping;
-          ashtray.rotation.y += spin.y * damping;
+          ashtray.rotation.x += spin.x * damping + mouse.y * 0.02;
+          ashtray.rotation.y += spin.y * damping + mouse.x * 0.02;
           ashtray.rotation.z += spin.z * damping;
-
-          // SIMPLIFIED: Just add small rotation based on mouse
-          const mouseInfluence = 0.02;
-          ashtray.rotation.x += mouse.y * mouseInfluence;
-          ashtray.rotation.y += mouse.x * mouseInfluence;
         }
       }
 
-      // Animate particles - SIMPLIFIED
-      particles.forEach((particle, index) => {
+      // Animate particles
+      particles.forEach((particle) => {
         const props = (particle as any).orbitProps;
         if (!props) return;
 
@@ -491,17 +437,12 @@ const Floating3DObjects: React.FC = () => {
         const bobOffset = Math.sin(time * 0.001) * props.bobAmplitude;
         const y = props.baseY + bobOffset;
 
-        // DIRECT assignment instead of interpolation
-        particle.position.x = x;
-        particle.position.z = z;
-        particle.position.y = y;
+        particle.position.set(x, y, z);
 
-        // Simple rotation
         particle.rotation.x += 0.005;
         particle.rotation.y += 0.007;
         particle.rotation.z += 0.003;
 
-        // Scale effect
         const targetScale = particle === hoveredObject ? 1.1 : 1.0;
         particle.scale.setScalar(targetScale);
       });
@@ -510,7 +451,7 @@ const Floating3DObjects: React.FC = () => {
     };
     animate(0);
 
-    // FIXED: Resize handler that doesn't affect camera position
+    // Resize handler - NO camera position changes
     const handleResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
@@ -518,10 +459,9 @@ const Floating3DObjects: React.FC = () => {
       camera.aspect = width / height;
       camera.fov = width < 768 ? 85 : 75;
       camera.updateProjectionMatrix();
-
-      // CRITICAL: DO NOT change camera position
-      // camera.position.z = getCameraDistance(); // REMOVED
-
+      
+      // DO NOT change camera position here
+      
       renderer.setSize(width, height);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
@@ -529,8 +469,7 @@ const Floating3DObjects: React.FC = () => {
         ashtray.scale.setScalar(getScale());
       }
 
-      const newIsMobile = isMobileScreen();
-      if (newIsMobile !== isMobile) setIsMobile(newIsMobile);
+      setIsMobile(isMobileScreen());
     };
 
     let resizeTimeout: ReturnType<typeof setTimeout>;
@@ -543,23 +482,26 @@ const Floating3DObjects: React.FC = () => {
     // Cleanup
     return () => {
       window.removeEventListener('resize', throttledResize);
-      window.removeEventListener('resize', checkMobile);
-      window.removeEventListener('scroll', scrollHandler);
       document.removeEventListener('mousemove', onPointerMove);
       document.removeEventListener('touchmove', onPointerMove);
-      document.removeEventListener('touchend', onTouchEnd);
 
-      if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
+      if (animationIdRef.current) {
+        cancelAnimationFrame(animationIdRef.current);
+      }
+
       if (resizeTimeout) clearTimeout(resizeTimeout);
-      if (scrollTimeout) clearTimeout(scrollTimeout);
 
+      // Clean up objects
       if (ashtray) {
         ashtray.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
             mesh.geometry.dispose();
-            if (Array.isArray(mesh.material)) mesh.material.forEach((m) => m.dispose());
-            else mesh.material.dispose();
+            if (Array.isArray(mesh.material)) {
+              mesh.material.forEach((m) => m.dispose());
+            } else {
+              mesh.material.dispose();
+            }
           }
         });
       }
@@ -569,36 +511,34 @@ const Floating3DObjects: React.FC = () => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
             mesh.geometry.dispose();
-            if (Array.isArray(mesh.material)) mesh.material.forEach((m) => m.dispose());
-            else mesh.material.dispose();
+            if (Array.isArray(mesh.material)) {
+              mesh.material.forEach((m) => m.dispose());
+            } else {
+              mesh.material.dispose();
+            }
           }
         });
-        scene.remove(particle);
+        if (sceneRef.current) {
+          sceneRef.current.remove(particle);
+        }
       });
 
-      if (mountRef.current && renderer.domElement) {
-        mountRef.current.removeChild(renderer.domElement);
+      // Remove canvas from body
+      if (canvas && document.body.contains(canvas)) {
+        document.body.removeChild(canvas);
       }
-      renderer.dispose();
+      
+      if (rendererRef.current) {
+        rendererRef.current.dispose();
+      }
     };
   }, []);
 
   return (
     <>
-      <div
-        ref={mountRef}
-        style={{ 
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          pointerEvents: 'none', 
-          zIndex: 1,
-          opacity: isLoaded ? 1 : 0,
-          transition: 'opacity 1s'
-        }}
-      />
+      {/* Empty container - the canvas is appended to body */}
+      <div ref={mountRef} style={{ display: 'none' }} />
+      
       {error && (
         <div style={{
           position: 'fixed',
@@ -609,7 +549,8 @@ const Floating3DObjects: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 10
+          zIndex: 10,
+          pointerEvents: 'none'
         }}>
           <div style={{
             textAlign: 'center',
