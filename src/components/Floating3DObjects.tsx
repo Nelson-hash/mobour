@@ -137,7 +137,37 @@ const Floating3DObjects: React.FC = () => {
     let hoveredObject: THREE.Object3D | null = null;
     let particles: THREE.Object3D[] = [];
 
-    const createParticles = (baseMaterial: THREE.MeshStandardMaterial, originalAshtray: THREE.Object3D) => {
+    // ---- Create Organic Blob Particles ----
+    const createBlobGeometry = (size: number, complexity: number = 6) => {
+      const geometry = new THREE.SphereGeometry(size, complexity * 2, complexity);
+      const vertices = geometry.attributes.position.array;
+      
+      // Deform sphere to create organic blob shape
+      for (let i = 0; i < vertices.length; i += 3) {
+        const x = vertices[i];
+        const y = vertices[i + 1];
+        const z = vertices[i + 2];
+        
+        // Apply noise-like deformation
+        const noise1 = Math.sin(x * 3 + y * 2) * Math.cos(z * 2.5) * 0.3;
+        const noise2 = Math.cos(x * 2.5 + z * 3) * Math.sin(y * 1.8) * 0.25;
+        const noise3 = Math.sin(x * 1.5 + y * 2.8 + z * 2.2) * 0.2;
+        
+        const deformation = (noise1 + noise2 + noise3) * size * 0.4;
+        const length = Math.sqrt(x * x + y * y + z * z);
+        const scale = (length + deformation) / length;
+        
+        vertices[i] = x * scale;
+        vertices[i + 1] = y * scale;
+        vertices[i + 2] = z * scale;
+      }
+      
+      geometry.attributes.position.needsUpdate = true;
+      geometry.computeVertexNormals();
+      return geometry;
+    };
+
+    const createParticles = (baseMaterial: THREE.MeshStandardMaterial) => {
       const particleConfigs = [
         // 2 small particles
         { size: 0.8, distance: 12, speed: 0.015, offsetY: 2, eccentricity: 0.7 },
@@ -152,21 +182,23 @@ const Floating3DObjects: React.FC = () => {
       ];
 
       return particleConfigs.map((config, index) => {
-        // Clone the original ashtray
-        const miniAshtray = originalAshtray.clone();
+        const blobGeometry = createBlobGeometry(config.size, isMobile ? 4 : 6);
+        const particleMaterial = baseMaterial.clone();
+        particleMaterial.transparent = false; // Remove transparency
+        particleMaterial.opacity = 1.0; // Full opacity
+        particleMaterial.roughness = 0.9;
+        particleMaterial.metalness = 0.02;
+        
+        const particle = new THREE.Mesh(blobGeometry, particleMaterial);
         
         // Set initial position
         const angle = (index / particleConfigs.length) * Math.PI * 2;
-        miniAshtray.position.x = Math.cos(angle) * config.distance;
-        miniAshtray.position.z = Math.sin(angle) * config.distance * config.eccentricity;
-        miniAshtray.position.y = config.offsetY;
-        
-        // Scale the mini ashtray
-        const scaleMultiplier = config.size * 0.3;
-        miniAshtray.scale.setScalar(getScale() * scaleMultiplier);
+        particle.position.x = Math.cos(angle) * config.distance;
+        particle.position.z = Math.sin(angle) * config.distance * config.eccentricity;
+        particle.position.y = config.offsetY;
         
         // Store animation properties
-        (miniAshtray as any).orbitProps = {
+        (particle as any).orbitProps = {
           distance: config.distance,
           speed: config.speed,
           baseY: config.offsetY,
@@ -177,8 +209,13 @@ const Floating3DObjects: React.FC = () => {
           bobAmplitude: 0.5 + Math.random() * 0.5
         };
         
-        scene.add(miniAshtray);
-        return miniAshtray;
+        if (!isMobile) {
+          particle.castShadow = true;
+          particle.receiveShadow = true;
+        }
+        
+        scene.add(particle);
+        return particle;
       });
     };
 
@@ -200,7 +237,6 @@ const Floating3DObjects: React.FC = () => {
         const checkComplete = () => {
           loadedCount++;
           if (loadedCount >= totalTextures) {
-            console.log('All textures loaded successfully');
             resolve();
           }
         };
@@ -214,7 +250,6 @@ const Floating3DObjects: React.FC = () => {
         textureLoader.load(
           '/textures/anthracite-diff.jpg',
           (texture) => {
-            console.log('Diffuse texture loaded');
             if ('colorSpace' in texture) (texture as any).colorSpace = THREE.SRGBColorSpace;
             else if ('encoding' in texture) (texture as any).encoding = THREE.sRGBEncoding;
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
@@ -227,11 +262,10 @@ const Floating3DObjects: React.FC = () => {
           handleError('Diffuse')
         );
 
-        // Load Normal texture - back to EXR
+        // Load Normal texture
         textureLoader.load(
           '/textures/anthracite-normal.exr',
           (texture) => {
-            console.log('Normal texture loaded');
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
             texture.repeat.set(2, 2);
             texture.needsUpdate = true;
@@ -242,11 +276,10 @@ const Floating3DObjects: React.FC = () => {
           handleError('Normal')
         );
 
-        // Load Roughness texture - back to EXR
+        // Load Roughness texture
         textureLoader.load(
           '/textures/anthracite-roughness.exr',
           (texture) => {
-            console.log('Roughness texture loaded');
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
             texture.repeat.set(2, 2);
             texture.needsUpdate = true;
@@ -261,7 +294,6 @@ const Floating3DObjects: React.FC = () => {
         textureLoader.load(
           '/textures/anthracite-disp.png',
           (texture) => {
-            console.log('Displacement texture loaded');
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
             texture.repeat.set(2, 2);
             texture.needsUpdate = true;
@@ -287,9 +319,9 @@ const Floating3DObjects: React.FC = () => {
         ashtray.scale.setScalar(getScale());
 
         const baseMaterialParams: THREE.MeshStandardMaterialParameters = {
-          color: new THREE.Color('#6b6b6b'), // Lighter concrete gray
-          roughness: 0.6,
-          metalness: 0.0, // Concrete is not metallic at all
+          color: new THREE.Color('#8a8a8a'), // Lighter, clearer gray base color
+          roughness: 0.7,
+          metalness: 0.0, // Concrete is not metallic
           transparent: true,
           opacity: 0
         };
@@ -297,30 +329,14 @@ const Floating3DObjects: React.FC = () => {
         // Apply PBR textures if loaded
         if (diffuseTexture) {
           baseMaterialParams.map = diffuseTexture;
-          console.log('Applied diffuse texture');
         }
         if (normalTexture) {
           baseMaterialParams.normalMap = normalTexture;
-          // Much more subtle normal intensity to avoid cracks
           baseMaterialParams.normalScale = new THREE.Vector2(0.1, 0.1);
-          console.log('Applied normal texture with very low intensity');
         }
         if (roughnessTexture) {
           baseMaterialParams.roughnessMap = roughnessTexture;
-          // Lower base roughness when using roughness map
-          baseMaterialParams.roughness = 0.7;
-          console.log('Applied roughness texture');
         }
-        if (displacementTexture) {
-          // Disable displacement for now to avoid geometry issues
-          // baseMaterialParams.displacementMap = displacementTexture;
-          // baseMaterialParams.displacementScale = isMobile ? 0.01 : 0.02;
-          console.log('Displacement texture loaded but disabled to avoid artifacts');
-        }
-
-        // Ensure proper material properties for concrete look
-        baseMaterialParams.metalness = 0.0; // Concrete is not metallic
-        baseMaterialParams.color = new THREE.Color('#8a8a8a'); // Lighter, clearer gray base color
 
         const templateMaterial = new THREE.MeshStandardMaterial(baseMaterialParams);
 
@@ -343,8 +359,8 @@ const Floating3DObjects: React.FC = () => {
 
         scene.add(ashtray);
 
-        // Create particles after ashtray is loaded - pass the ashtray for cloning
-        particles = createParticles(templateMaterial, ashtray);
+        // Create particles after ashtray is loaded
+        particles = createParticles(templateMaterial);
 
         // Fade-in
         const startTime = Date.now();
@@ -371,7 +387,6 @@ const Floating3DObjects: React.FC = () => {
             const particleEased = 1 - Math.pow(1 - particleP, 3);
             
             const mat = (particle as THREE.Mesh).material as THREE.MeshStandardMaterial;
-            // Particles fade in to full opacity (no transparency)
             mat.opacity = particleEased;
           });
           
@@ -386,8 +401,8 @@ const Floating3DObjects: React.FC = () => {
             });
             particles.forEach(particle => {
               const mat = (particle as THREE.Mesh).material as THREE.MeshStandardMaterial;
-              mat.transparent = false; // No transparency after fade-in
-              mat.opacity = 1.0; // Full opacity
+              mat.transparent = false;
+              mat.opacity = 1.0;
             });
           }
         };
