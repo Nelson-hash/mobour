@@ -104,16 +104,16 @@ const Floating3DObjects: React.FC = () => {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
     
-    // Set fixed positioning to prevent scroll issues
-    renderer.domElement.style.position = 'fixed';
-    renderer.domElement.style.top = '0';
-    renderer.domElement.style.left = '0';
-    renderer.domElement.style.width = '100vw';
-    renderer.domElement.style.height = '100vh';
-    renderer.domElement.style.zIndex = '1';
-    renderer.domElement.style.pointerEvents = 'none';
-    renderer.domElement.style.transform = 'translate3d(0, 0, 0)';
-    renderer.domElement.style.backfaceVisibility = 'hidden';
+    // Set fixed positioning to prevent scroll issues - simplified approach
+    renderer.domElement.style.cssText = `
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 1 !important;
+      pointer-events: none !important;
+    `;
     
     mountRef.current.appendChild(renderer.domElement);
 
@@ -442,6 +442,8 @@ const Floating3DObjects: React.FC = () => {
         return;
       }
 
+      // Use clientX/Y (viewport relative) instead of pageX/Y (document relative)
+      // This ensures mouse coordinates are always relative to viewport, not scroll position
       mouse.x = (clientX / window.innerWidth) * 2 - 1;
       mouse.y = -(clientY / window.innerHeight) * 2 + 1;
 
@@ -615,25 +617,40 @@ const Floating3DObjects: React.FC = () => {
     <>
       <div
         ref={mountRef}
-        className={`fixed inset-0 transition-opacity duration-1000 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
         style={{ 
-          pointerEvents: 'none', 
-          zIndex: 1,
           position: 'fixed',
           top: 0,
           left: 0,
           width: '100vw',
           height: '100vh',
-          transform: 'translate3d(0, 0, 0)',
-          backfaceVisibility: 'hidden'
+          pointerEvents: 'none', 
+          zIndex: 1,
+          opacity: isLoaded ? 1 : 0,
+          transition: 'opacity 1s'
         }}
       />
       {error && (
-        <div className="fixed inset-0 flex items-center justify-center z-10">
-          <div className="text-center bg-white bg-opacity-90 px-6 py-4 rounded-lg shadow-lg">
-            <p className="text-red-600 font-medium mb-2">3D Model Error</p>
-            <p className="text-sm text-gray-600 mb-4">{error}</p>
-            <p className="text-xs text-gray-500">Using geometric fallback instead</p>
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10
+        }}>
+          <div style={{
+            textAlign: 'center',
+            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            padding: '24px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+          }}>
+            <p style={{ color: '#dc2626', fontWeight: '500', marginBottom: '8px' }}>3D Model Error</p>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '16px' }}>{error}</p>
+            <p style={{ color: '#9ca3af', fontSize: '12px' }}>Using geometric fallback instead</p>
           </div>
         </div>
       )}
