@@ -11,6 +11,8 @@
     -webkit-overflow-scrolling: touch;
     /* Prevent zoom on input focus on iOS */
     -webkit-text-size-adjust: 100%;
+    /* Ensure body doesn't create scroll context for canvas */
+    position: relative;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -24,6 +26,66 @@
     font-display: swap;
   }
 }
+
+/* CRITICAL: 3D CANVAS POSITIONING FIX */
+/* Force the 3D canvas to be completely independent of page flow */
+canvas[data-engine*="three"],
+canvas {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 1 !important;
+  pointer-events: none !important;
+  transform: none !important;
+  /* CRITICAL: Break out of any stacking context */
+  will-change: auto !important;
+  /* Ensure no margin/padding inheritance */
+  margin: 0 !important;
+  padding: 0 !important;
+  /* Debug border - REMOVE this line after confirming fix works */
+  border: 2px solid red !important;
+}
+
+/* Ensure no parent containers affect the canvas positioning */
+.hero-section,
+.floating-3d-container,
+#root {
+  /* Remove any transforms that create stacking contexts */
+  transform: none !important;
+  /* Ensure no overflow clipping */
+  overflow: visible !important;
+}
+
+/* Alternative approach - create a dedicated 3D layer */
+.three-js-layer {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 1 !important;
+  pointer-events: none !important;
+  /* Completely independent of document flow */
+  isolation: isolate;
+}
+
+/* Nuclear option - if above doesn't work, uncomment this */
+/*
+canvas {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 1 !important;
+  pointer-events: none !important;
+  all: unset !important;
+  position: fixed !important;
+  inset: 0 !important;
+  display: block !important;
+}
+*/
 
 @layer utilities {
   .animate-fade-in-up {
@@ -180,39 +242,4 @@ img[loading="lazy"].loaded {
 .loading-skeleton {
   background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
   background-size: 200% 100%;
-  animation: loading 1.2s infinite;
-}
-
-@keyframes loading {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-
-/* Print styles */
-@media print {
-  .no-print {
-    display: none !important;
-  }
-  
-  /* Optimize for print */
-  body {
-    font-size: 12pt;
-    line-height: 1.4;
-  }
-  
-  img {
-    max-width: 100% !important;
-    height: auto !important;
-  }
-}
-
-/* Container queries for responsive design (when supported) */
-@supports (container-type: inline-size) {
-  .container-responsive {
-    container-type: inline-size;
-  }
-}
+  animation: loading 1.
