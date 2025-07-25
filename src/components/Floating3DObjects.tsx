@@ -52,8 +52,6 @@ const Floating3DObjects: React.FC = () => {
   const mountRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const animationIdRef = useRef<number>();
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.Camera | null>(null);
 
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,19 +70,16 @@ const Floating3DObjects: React.FC = () => {
     checkMobile();
     window.addEventListener('resize', checkMobile);
 
-    // FIXED: Create scene with proper coordinate system
     const scene = new THREE.Scene();
-    sceneRef.current = scene;
 
-    // FIXED: Setup camera with stable positioning
     const camera = new THREE.PerspectiveCamera(
       isMobile ? 85 : 75,
       window.innerWidth / window.innerHeight,
       0.1,
       1000
     );
-    cameraRef.current = camera;
 
+    // FIXED: Store camera distance and never change it
     const getCameraDistance = () => {
       if (window.innerWidth < 480) return 45;
       if (window.innerWidth < 768) return 40;
@@ -92,8 +87,8 @@ const Floating3DObjects: React.FC = () => {
       return 30;
     };
     
-    // FIXED: Set camera position ONCE and don't modify it based on scroll
-    camera.position.set(0, 0, getCameraDistance());
+    const FIXED_CAMERA_DISTANCE = getCameraDistance();
+    camera.position.set(0, 0, FIXED_CAMERA_DISTANCE);
     camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({
@@ -101,34 +96,30 @@ const Floating3DObjects: React.FC = () => {
       alpha: true,
       powerPreference: 'high-performance'
     });
-    
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setClearColor(0x000000, 0);
     
-    // Color space setup
+    // Color space
     (renderer as any).outputColorSpace = THREE.SRGBColorSpace ?? undefined;
     if ((renderer as any).outputEncoding !== undefined) {
       (renderer as any).outputEncoding = THREE.sRGBEncoding;
     }
-    
     renderer.shadowMap.enabled = !isMobile;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
     
-    // FIXED: Absolute positioning without any transforms
-    const canvas = renderer.domElement;
-    canvas.style.position = 'fixed';
-    canvas.style.top = '0';
-    canvas.style.left = '0';
-    canvas.style.width = '100vw';
-    canvas.style.height = '100vh';
-    canvas.style.zIndex = '1';
-    canvas.style.pointerEvents = 'none';
+    // FIXED: Absolute positioning
+    renderer.domElement.style.position = 'fixed';
+    renderer.domElement.style.top = '0';
+    renderer.domElement.style.left = '0';
+    renderer.domElement.style.width = '100vw';
+    renderer.domElement.style.height = '100vh';
+    renderer.domElement.style.zIndex = '1';
+    renderer.domElement.style.pointerEvents = 'none';
     
-    mountRef.current.appendChild(canvas);
+    mountRef.current.appendChild(renderer.domElement);
 
-    // Lighting setup
     const ambientLight = new THREE.AmbientLight(0xf0f0f0, isMobile ? 0.8 : 0.7);
     scene.add(ambientLight);
 
@@ -148,7 +139,6 @@ const Floating3DObjects: React.FC = () => {
     accentLight.position.set(0, 10, 0);
     scene.add(accentLight);
 
-    // Variables for 3D objects
     const loader = new GLTFLoader();
     let ashtray: THREE.Object3D | null = null;
     let hoveredObject: THREE.Object3D | null = null;
@@ -228,7 +218,7 @@ const Floating3DObjects: React.FC = () => {
       });
     };
 
-    // Texture loading
+    // Texture Handling
     const textureLoader = new THREE.TextureLoader();
     textureLoader.setCrossOrigin('anonymous');
     
@@ -289,7 +279,6 @@ const Floating3DObjects: React.FC = () => {
         }, undefined, handleError('Displacement'));
       });
 
-    // Model loading
     const loadModel = async () => {
       try {
         await loadTextures();
@@ -340,7 +329,7 @@ const Floating3DObjects: React.FC = () => {
         scene.add(ashtray);
         particles = createParticles(templateMaterial);
 
-        // Fade-in animation
+        // Fade-in
         const startTime = Date.now();
         const fadeDuration = isMobile ? 600 : 800;
         const fadeIn = () => {
@@ -393,16 +382,12 @@ const Floating3DObjects: React.FC = () => {
 
     loadModel();
 
-    // FIXED: Mouse interaction with proper viewport coordinates
+    // FIXED: Mouse interaction
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
     let isTouch = false;
 
     const onPointerMove = (event: MouseEvent | TouchEvent) => {
-      // FIXED: Get coordinates relative to the CANVAS, not the document
-      const canvas = renderer.domElement;
-      const rect = canvas.getBoundingClientRect();
-      
       let clientX: number;
       let clientY: number;
 
@@ -418,11 +403,10 @@ const Floating3DObjects: React.FC = () => {
         return;
       }
 
-      // FIXED: Calculate mouse position relative to canvas bounds
-      mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      // FIXED: Simple viewport coordinates
+      mouse.x = (clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(clientY / window.innerHeight) * 2 + 1;
 
-      // Interaction detection
       if (!isMobile || isTouch) {
         if (ashtray) {
           raycaster.setFromCamera(mouse, camera);
@@ -440,7 +424,6 @@ const Floating3DObjects: React.FC = () => {
       }
     };
 
-    // FIXED: Use document for mouse events to ensure we catch them everywhere
     document.addEventListener('mousemove', onPointerMove);
     document.addEventListener('touchmove', onPointerMove, { passive: true });
     
@@ -450,15 +433,32 @@ const Floating3DObjects: React.FC = () => {
     };
     document.addEventListener('touchend', onTouchEnd);
 
-    // Animation loop
-    let lastTime = 0;
-    const targetFPS = isMobile ? 30 : 60;
-    const interval = 1000 / targetFPS;
+    // FIXED: Animation loop with scroll protection
+    let isScrolling = false;
+    let scrollTimeout: ReturnType<typeof setTimeout>;
+
+    const scrollHandler = () => {
+      isScrolling = true;
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        isScrolling = false;
+      }, 50);
+    };
+
+    window.addEventListener('scroll', scrollHandler, { passive: true });
 
     const animate = (time: number) => {
       animationIdRef.current = requestAnimationFrame(animate);
-      if (isMobile && time - lastTime < interval) return;
-      lastTime = time;
+      
+      // CRITICAL: Force camera to stay in fixed position
+      camera.position.set(0, 0, FIXED_CAMERA_DISTANCE);
+      camera.lookAt(0, 0, 0);
+      
+      // EMERGENCY: Skip heavy calculations during scroll
+      if (isScrolling) {
+        renderer.render(scene, camera);
+        return;
+      }
 
       if (ashtray) {
         const spin = (ashtray as any).spinSpeed;
@@ -472,57 +472,55 @@ const Floating3DObjects: React.FC = () => {
           ashtray.rotation.y += spin.y * damping;
           ashtray.rotation.z += spin.z * damping;
 
-          const sensitivity = isMobile ? 10 : 15;
-          const mousePos3D = new THREE.Vector3(mouse.x * sensitivity, mouse.y * sensitivity, 8);
-          const dir = new THREE.Vector3().subVectors(mousePos3D, ashtray.position).normalize();
-          const targetRot = new THREE.Euler();
-          targetRot.setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir));
-          const rotSpeed = isMobile ? 0.015 : 0.02;
-          ashtray.rotation.x += (targetRot.x - ashtray.rotation.x) * rotSpeed;
-          ashtray.rotation.y += (targetRot.y - ashtray.rotation.y) * rotSpeed;
+          // SIMPLIFIED: Just add small rotation based on mouse
+          const mouseInfluence = 0.02;
+          ashtray.rotation.x += mouse.y * mouseInfluence;
+          ashtray.rotation.y += mouse.x * mouseInfluence;
         }
       }
 
-      // Animate particles
+      // Animate particles - SIMPLIFIED
       particles.forEach((particle, index) => {
         const props = (particle as any).orbitProps;
         if (!props) return;
 
         props.currentAngle += props.speed;
+        
         const x = Math.cos(props.currentAngle) * props.distance;
         const z = Math.sin(props.currentAngle) * props.distance * props.eccentricity;
-        const bobOffset = Math.sin(time * 0.001 * (1 + index * 0.3)) * props.bobAmplitude;
+        const bobOffset = Math.sin(time * 0.001) * props.bobAmplitude;
         const y = props.baseY + bobOffset;
 
-        particle.position.x += (x - particle.position.x) * 0.02;
-        particle.position.z += (z - particle.position.z) * 0.02;
-        particle.position.y += (y - particle.position.y) * 0.03;
+        // DIRECT assignment instead of interpolation
+        particle.position.x = x;
+        particle.position.z = z;
+        particle.position.y = y;
 
-        if (particles.indexOf(particle) !== hoveredObject) {
-          particle.rotation.x += 0.005 + index * 0.001;
-          particle.rotation.y += 0.007 - index * 0.0015;
-          particle.rotation.z += 0.003 + index * 0.002;
-        }
+        // Simple rotation
+        particle.rotation.x += 0.005;
+        particle.rotation.y += 0.007;
+        particle.rotation.z += 0.003;
 
+        // Scale effect
         const targetScale = particle === hoveredObject ? 1.1 : 1.0;
-        const currentScale = particle.scale.x;
-        const newScale = currentScale + (targetScale - currentScale) * 0.1;
-        particle.scale.setScalar(newScale);
+        particle.scale.setScalar(targetScale);
       });
 
       renderer.render(scene, camera);
     };
     animate(0);
 
-    // FIXED: Resize handler that doesn't affect positioning
+    // FIXED: Resize handler that doesn't affect camera position
     const handleResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
       
       camera.aspect = width / height;
       camera.fov = width < 768 ? 85 : 75;
-      camera.position.z = getCameraDistance();
       camera.updateProjectionMatrix();
+
+      // CRITICAL: DO NOT change camera position
+      // camera.position.z = getCameraDistance(); // REMOVED
 
       renderer.setSize(width, height);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -546,14 +544,15 @@ const Floating3DObjects: React.FC = () => {
     return () => {
       window.removeEventListener('resize', throttledResize);
       window.removeEventListener('resize', checkMobile);
+      window.removeEventListener('scroll', scrollHandler);
       document.removeEventListener('mousemove', onPointerMove);
       document.removeEventListener('touchmove', onPointerMove);
       document.removeEventListener('touchend', onTouchEnd);
 
       if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
       if (resizeTimeout) clearTimeout(resizeTimeout);
+      if (scrollTimeout) clearTimeout(scrollTimeout);
 
-      // Cleanup 3D objects
       if (ashtray) {
         ashtray.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
