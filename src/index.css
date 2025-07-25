@@ -71,21 +71,36 @@ canvas {
   isolation: isolate;
 }
 
-/* Nuclear option - if above doesn't work, uncomment this */
-/*
+/* NUCLEAR OPTION - Most aggressive canvas positioning fix */
 canvas {
+  /* Reset ALL CSS properties first */
+  all: unset !important;
+  /* Then apply only what we need */
   position: fixed !important;
-  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
   z-index: 1 !important;
   pointer-events: none !important;
-  all: unset !important;
-  position: fixed !important;
-  inset: 0 !important;
   display: block !important;
+  /* Force break from any parent positioning context */
+  transform: none !important;
+  transform-origin: initial !important;
+  perspective: none !important;
+  perspective-origin: initial !important;
+  /* Ensure no inheritance */
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 2px solid red !important; /* DEBUG - Remove after testing */
+  /* Force GPU layer */
+  will-change: transform !important;
+  backface-visibility: hidden !important;
+  /* Break stacking context completely */
+  isolation: isolate !important;
 }
-*/
 
 @layer utilities {
   .animate-fade-in-up {
