@@ -137,37 +137,7 @@ const Floating3DObjects: React.FC = () => {
     let hoveredObject: THREE.Object3D | null = null;
     let particles: THREE.Object3D[] = [];
 
-    // ---- Create Organic Blob Particles ----
-    const createBlobGeometry = (size: number, complexity: number = 6) => {
-      const geometry = new THREE.SphereGeometry(size, complexity * 2, complexity);
-      const vertices = geometry.attributes.position.array;
-      
-      // Deform sphere to create organic blob shape
-      for (let i = 0; i < vertices.length; i += 3) {
-        const x = vertices[i];
-        const y = vertices[i + 1];
-        const z = vertices[i + 2];
-        
-        // Apply noise-like deformation
-        const noise1 = Math.sin(x * 3 + y * 2) * Math.cos(z * 2.5) * 0.3;
-        const noise2 = Math.cos(x * 2.5 + z * 3) * Math.sin(y * 1.8) * 0.25;
-        const noise3 = Math.sin(x * 1.5 + y * 2.8 + z * 2.2) * 0.2;
-        
-        const deformation = (noise1 + noise2 + noise3) * size * 0.4;
-        const length = Math.sqrt(x * x + y * y + z * z);
-        const scale = (length + deformation) / length;
-        
-        vertices[i] = x * scale;
-        vertices[i + 1] = y * scale;
-        vertices[i + 2] = z * scale;
-      }
-      
-      geometry.attributes.position.needsUpdate = true;
-      geometry.computeVertexNormals();
-      return geometry;
-    };
-
-    const createParticles = (baseMaterial: THREE.MeshStandardMaterial) => {
+    const createParticles = (baseMaterial: THREE.MeshStandardMaterial, originalAshtray: THREE.Object3D) => {
       const particleConfigs = [
         // 2 small particles
         { size: 0.8, distance: 12, speed: 0.015, offsetY: 2, eccentricity: 0.7 },
@@ -182,44 +152,21 @@ const Floating3DObjects: React.FC = () => {
       ];
 
       return particleConfigs.map((config, index) => {
-        const blobGeometry = createBlobGeometry(config.size, isMobile ? 4 : 6);
-        const particleMaterial = baseMaterial.clone();
-        particleMaterial.transparent = false; // Remove transparency
-        particleMaterial.opacity = 1.0; // Full opacity
-        particleMaterial.roughness = 0.9;
-        particleMaterial.metalness = 0.02;
-        
-        // Apply same textures to particles but with different scaling
-        if (diffuseTexture) {
-          const particleDiffuse = diffuseTexture.clone();
-          particleDiffuse.repeat.set(1, 1); // Smaller repeat for particles
-          particleDiffuse.needsUpdate = true;
-          particleMaterial.map = particleDiffuse;
-        }
-        if (normalTexture) {
-          const particleNormal = normalTexture.clone();
-          particleNormal.repeat.set(1, 1);
-          particleNormal.needsUpdate = true;
-          particleMaterial.normalMap = particleNormal;
-          particleMaterial.normalScale = new THREE.Vector2(0.05, 0.05); // Extremely subtle normal for particles
-        }
-        if (roughnessTexture) {
-          const particleRoughness = roughnessTexture.clone();
-          particleRoughness.repeat.set(1, 1);
-          particleRoughness.needsUpdate = true;
-          particleMaterial.roughnessMap = particleRoughness;
-        }
-        
-        const particle = new THREE.Mesh(blobGeometry, particleMaterial);
+        // Clone the original ashtray
+        const miniAshtray = originalAshtray.clone();
         
         // Set initial position
         const angle = (index / particleConfigs.length) * Math.PI * 2;
-        particle.position.x = Math.cos(angle) * config.distance;
-        particle.position.z = Math.sin(angle) * config.distance * config.eccentricity;
-        particle.position.y = config.offsetY;
+        miniAshtray.position.x = Math.cos(angle) * config.distance;
+        miniAshtray.position.z = Math.sin(angle) * config.distance * config.eccentricity;
+        miniAshtray.position.y = config.offsetY;
+        
+        // Scale the mini ashtray
+        const scaleMultiplier = config.size * 0.3;
+        miniAshtray.scale.setScalar(getScale() * scaleMultiplier);
         
         // Store animation properties
-        (particle as any).orbitProps = {
+        (miniAshtray as any).orbitProps = {
           distance: config.distance,
           speed: config.speed,
           baseY: config.offsetY,
@@ -230,13 +177,8 @@ const Floating3DObjects: React.FC = () => {
           bobAmplitude: 0.5 + Math.random() * 0.5
         };
         
-        if (!isMobile) {
-          particle.castShadow = true;
-          particle.receiveShadow = true;
-        }
-        
-        scene.add(particle);
-        return particle;
+        scene.add(miniAshtray);
+        return miniAshtray;
       });
     };
 
@@ -401,8 +343,8 @@ const Floating3DObjects: React.FC = () => {
 
         scene.add(ashtray);
 
-        // Create particles after ashtray is loaded
-        particles = createParticles(templateMaterial);
+        // Create particles after ashtray is loaded - pass the ashtray for cloning
+        particles = createParticles(templateMaterial, ashtray);
 
         // Fade-in
         const startTime = Date.now();
@@ -632,12 +574,14 @@ const Floating3DObjects: React.FC = () => {
 
       // Cleanup particles
       particles.forEach(particle => {
-        if ((particle as THREE.Mesh).isMesh) {
-          const mesh = particle as THREE.Mesh;
-          mesh.geometry.dispose();
-          if (Array.isArray(mesh.material)) mesh.material.forEach((m) => m.dispose());
-          else mesh.material.dispose();
-        }
+        particle.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mesh = child as THREE.Mesh;
+            mesh.geometry.dispose();
+            if (Array.isArray(mesh.material)) mesh.material.forEach((m) => m.dispose());
+            else mesh.material.dispose();
+          }
+        });
         scene.remove(particle);
       });
 
