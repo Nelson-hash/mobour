@@ -10,6 +10,25 @@ interface ProductGridProps {
   showFilters?: boolean;
 }
 
+// Component for "SOON" placeholder cards
+const SoonCard: React.FC = () => (
+  <div className="bg-white rounded-lg shadow-lg overflow-hidden transition-transform duration-300 hover:scale-105">
+    <div className="relative h-64 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center overflow-hidden">
+      {/* Shimmer effect */}
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent transform -skew-x-12 translate-x-full animate-shimmer"></div>
+      <span className="text-2xl font-light text-gray-500 tracking-widest z-10">SOON</span>
+    </div>
+    <div className="p-6">
+      <div className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-2">
+        MOBILIER
+      </div>
+      <h3 className="text-xl font-light text-gray-400">
+        À venir
+      </h3>
+    </div>
+  </div>
+);
+
 const ProductGrid: React.FC<ProductGridProps> = ({ 
   products, 
   title, 
@@ -54,6 +73,18 @@ const ProductGrid: React.FC<ProductGridProps> = ({
   const handleViewModeChange = useCallback((mode: 'grid' | 'list') => {
     setViewMode(mode);
   }, []);
+
+  // Create the 2x2 grid with products + SOON placeholders
+  const gridItems = useMemo(() => {
+    const items = [...filteredProducts];
+    
+    // Fill remaining slots with SOON placeholders up to 4 total
+    while (items.length < 4) {
+      items.push(null);
+    }
+    
+    return items.slice(0, 4); // Ensure exactly 4 items
+  }, [filteredProducts]);
 
   return (
     <section className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
@@ -129,20 +160,22 @@ const ProductGrid: React.FC<ProductGridProps> = ({
         </div>
       )}
 
-      {/* Products Grid */}
-      <div className={`grid gap-8 ${
-        viewMode === 'grid' 
-          ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' 
-          : 'grid-cols-1'
-      }`}>
-        {filteredProducts.map((product) => (
-          <div key={product.id} className="animate-fade-in-up">
-            <ProductCard 
-              product={product} 
-              onViewProduct={onViewProduct}
-            />
-          </div>
-        ))}
+      {/* 2x2 Products Grid */}
+      <div className="max-w-4xl mx-auto">
+        <div className="grid grid-cols-2 gap-8 sm:gap-12 md:gap-16">
+          {gridItems.map((product, index) => (
+            <div key={product?.id || `soon-${index}`} className="animate-fade-in-up">
+              {product ? (
+                <ProductCard 
+                  product={product} 
+                  onViewProduct={onViewProduct}
+                />
+              ) : (
+                <SoonCard />
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* No Products */}
@@ -159,6 +192,16 @@ const ProductGrid: React.FC<ProductGridProps> = ({
           </p>
         </div>
       )}
+
+      <style jsx>{`
+        @keyframes shimmer {
+          0% { transform: translateX(-100%) skewX(-12deg); }
+          100% { transform: translateX(200%) skewX(-12deg); }
+        }
+        .animate-shimmer {
+          animation: shimmer 3s infinite;
+        }
+      `}</style>
     </section>
   );
 };
