@@ -1,12 +1,19 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, ReactElement } from 'react';
+import { createPortal } from 'react-dom';
 import * as THREE from 'three';
 
+/* ----------  GLTFLoader with geometric fallback ---------- */
 const GLTFLoader = (() => {
-  if (typeof window !== 'undefined' && (window as any).THREE) {
+  if (typeof window !== 'undefined' && (window as any).THREE?.GLTFLoader) {
     return (window as any).THREE.GLTFLoader;
   }
-  class GLTFLoader {
-    load(url: string, onLoad: (gltf: any) => void, onProgress?: (p: any) => void, onError?: (e: any) => void) {
+  class GLTFLoaderFallback {
+    load(
+      url: string,
+      onLoad: (gltf: any) => void,
+      onProgress?: (p: any) => void,
+      onError?: (e: any) => void
+    ) {
       import('three/examples/jsm/loaders/GLTFLoader.js')
         .then((module) => {
           const loader = new module.GLTFLoader();
@@ -45,11 +52,12 @@ const GLTFLoader = (() => {
       return group;
     }
   }
-  return GLTFLoader;
+  return GLTFLoaderFallback;
 })();
 
-const Floating3DObjects: React.FC = () => {
-  const mountRef = useRef<HTMLDivElement>(null);
+/* --------------------------------------------------------- */
+const Floating3DObjects: React.FC = (): ReactElement => {
+  const mountRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const animationIdRef = useRef<number>();
 
@@ -57,11 +65,13 @@ const Floating3DObjects: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
+  /* ===================  EFFECT  =================== */
   useEffect(() => {
     if (!mountRef.current) return;
 
+    /* ----- helpers & device info ----- */
     const isMobileScreen = () => window.innerWidth < 768;
-    const SCALE_FACTOR = 0.512; // final factor (another 20% applied)
+    const SCALE_FACTOR = 0.512;
     const BASE_MOBILE = 15.0;
     const BASE_DESKTOP = 24.0;
     const getScale = () => (isMobileScreen() ? BASE_MOBILE : BASE_DESKTOP) * SCALE_FACTOR;
@@ -70,6 +80,7 @@ const Floating3DObjects: React.FC = () => {
     checkMobile();
     window.addEventListener('resize', checkMobile);
 
+    /* ----- scene / camera / renderer ----- */
     const scene = new THREE.Scene();
 
     const camera = new THREE.PerspectiveCamera(
@@ -95,7 +106,6 @@ const Floating3DObjects: React.FC = () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setClearColor(0x000000, 0);
-    // color space
     (renderer as any).outputColorSpace = THREE.SRGBColorSpace ?? undefined;
     if ((renderer as any).outputEncoding !== undefined) {
       (renderer as any).outputEncoding = THREE.sRGBEncoding;
@@ -103,8 +113,8 @@ const Floating3DObjects: React.FC = () => {
     renderer.shadowMap.enabled = !isMobile;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
-    
-    // FIXED: Set fixed positioning to prevent scroll issues - simplified approach
+
+    /* ---- style still applied on the canvas element ---- */
     renderer.domElement.style.cssText = `
       position: fixed !important;
       top: 0 !important;
@@ -114,9 +124,11 @@ const Floating3DObjects: React.FC = () => {
       z-index: 1 !important;
       pointer-events: none !important;
     `;
-    
+
+    /* --------------- mount canvas --------------- */
     mountRef.current.appendChild(renderer.domElement);
 
+    /* --------------- lights --------------------- */
     const ambientLight = new THREE.AmbientLight(0xf0f0f0, isMobile ? 0.8 : 0.7);
     scene.add(ambientLight);
 
@@ -136,36 +148,35 @@ const Floating3DObjects: React.FC = () => {
     accentLight.position.set(0, 10, 0);
     scene.add(accentLight);
 
+    /* -------- load model + textures -------- */
     const loader = new GLTFLoader();
     let ashtray: THREE.Object3D | null = null;
     let hoveredObject: THREE.Object3D | null = null;
     let particles: THREE.Object3D[] = [];
 
-    // ---- Create Organic Blob Particles ----
+    /* --- create organic blob particles helper --- */
     const createBlobGeometry = (size: number, complexity: number = 6) => {
       const geometry = new THREE.SphereGeometry(size, complexity * 2, complexity);
-      const vertices = geometry.attributes.position.array;
-      
-      // Deform sphere to create organic blob shape
+      const vertices = geometry.attributes.position.array as Float32Array;
+
       for (let i = 0; i < vertices.length; i += 3) {
         const x = vertices[i];
         const y = vertices[i + 1];
         const z = vertices[i + 2];
-        
-        // Apply noise-like deformation
+
         const noise1 = Math.sin(x * 3 + y * 2) * Math.cos(z * 2.5) * 0.3;
         const noise2 = Math.cos(x * 2.5 + z * 3) * Math.sin(y * 1.8) * 0.25;
         const noise3 = Math.sin(x * 1.5 + y * 2.8 + z * 2.2) * 0.2;
-        
+
         const deformation = (noise1 + noise2 + noise3) * size * 0.4;
         const length = Math.sqrt(x * x + y * y + z * z);
         const scale = (length + deformation) / length;
-        
+
         vertices[i] = x * scale;
         vertices[i + 1] = y * scale;
         vertices[i + 2] = z * scale;
       }
-      
+
       geometry.attributes.position.needsUpdate = true;
       geometry.computeVertexNormals();
       return geometry;
@@ -173,14 +184,10 @@ const Floating3DObjects: React.FC = () => {
 
     const createParticles = (baseMaterial: THREE.MeshStandardMaterial) => {
       const particleConfigs = [
-        // 2 small particles
         { size: 0.8, distance: 12, speed: 0.015, offsetY: 2, eccentricity: 0.7 },
         { size: 0.6, distance: 15, speed: -0.012, offsetY: -3, eccentricity: 0.8 },
-        // 1 medium particle
         { size: 1.4, distance: 18, speed: 0.008, offsetY: 1, eccentricity: 0.6 },
-        // 1 large particle
         { size: 2.2, distance: 22, speed: -0.006, offsetY: -1.5, eccentricity: 0.9 },
-        // 2 additional particles
         { size: 1.0, distance: 14, speed: 0.011, offsetY: 3.5, eccentricity: 0.75 },
         { size: 1.6, distance: 20, speed: -0.009, offsetY: -2.5, eccentricity: 0.65 }
       ];
@@ -188,20 +195,18 @@ const Floating3DObjects: React.FC = () => {
       return particleConfigs.map((config, index) => {
         const blobGeometry = createBlobGeometry(config.size, isMobile ? 4 : 6);
         const particleMaterial = baseMaterial.clone();
-        particleMaterial.transparent = false; // Remove transparency
-        particleMaterial.opacity = 1.0; // Full opacity
+        particleMaterial.transparent = false;
+        particleMaterial.opacity = 1.0;
         particleMaterial.roughness = 0.9;
         particleMaterial.metalness = 0.02;
-        
+
         const particle = new THREE.Mesh(blobGeometry, particleMaterial);
-        
-        // Set initial position
+
         const angle = (index / particleConfigs.length) * Math.PI * 2;
         particle.position.x = Math.cos(angle) * config.distance;
         particle.position.z = Math.sin(angle) * config.distance * config.eccentricity;
         particle.position.y = config.offsetY;
-        
-        // Store animation properties
+
         (particle as any).orbitProps = {
           distance: config.distance,
           speed: config.speed,
@@ -212,22 +217,21 @@ const Floating3DObjects: React.FC = () => {
           bobSpeed: (Math.random() - 0.5) * 0.02,
           bobAmplitude: 0.5 + Math.random() * 0.5
         };
-        
+
         if (!isMobile) {
           particle.castShadow = true;
           particle.receiveShadow = true;
         }
-        
+
         scene.add(particle);
         return particle;
       });
     };
 
-    // ---- Texture Handling ----
-    const COLOR_HEX = '#525350';
+    /* ---- textures ---- */
     const textureLoader = new THREE.TextureLoader();
     textureLoader.setCrossOrigin('anonymous');
-    
+
     let diffuseTexture: THREE.Texture | null = null;
     let normalTexture: THREE.Texture | null = null;
     let roughnessTexture: THREE.Texture | null = null;
@@ -237,71 +241,58 @@ const Floating3DObjects: React.FC = () => {
       new Promise<void>((resolve) => {
         let loadedCount = 0;
         const totalTextures = 4;
-        
         const checkComplete = () => {
           loadedCount++;
-          if (loadedCount >= totalTextures) {
-            resolve();
-          }
+          if (loadedCount >= totalTextures) resolve();
         };
-
-        const handleError = (textureType: string) => (err: any) => {
-          console.warn(`${textureType} texture load error:`, err);
+        const handleError = (type: string) => (err: any) => {
+          console.warn(`${type} texture load error:`, err);
           checkComplete();
         };
 
-        // Load Diffuse (Albedo) texture
         textureLoader.load(
           '/textures/anthracite-diff.jpg',
-          (texture) => {
-            if ('colorSpace' in texture) (texture as any).colorSpace = THREE.SRGBColorSpace;
-            else if ('encoding' in texture) (texture as any).encoding = THREE.sRGBEncoding;
-            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-            texture.repeat.set(2, 2);
-            texture.needsUpdate = true;
-            diffuseTexture = texture;
+          (t) => {
+            ('colorSpace' in t ? (t as any).colorSpace = THREE.SRGBColorSpace : (t as any).encoding = THREE.sRGBEncoding);
+            t.wrapS = t.wrapT = THREE.RepeatWrapping;
+            t.repeat.set(2, 2);
+            diffuseTexture = t;
             checkComplete();
           },
           undefined,
           handleError('Diffuse')
         );
 
-        // Load Normal texture
         textureLoader.load(
           '/textures/anthracite-normal.exr',
-          (texture) => {
-            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-            texture.repeat.set(2, 2);
-            texture.needsUpdate = true;
-            normalTexture = texture;
+          (t) => {
+            t.wrapS = t.wrapT = THREE.RepeatWrapping;
+            t.repeat.set(2, 2);
+            normalTexture = t;
             checkComplete();
           },
           undefined,
           handleError('Normal')
         );
 
-        // Load Roughness texture
         textureLoader.load(
           '/textures/anthracite-roughness.exr',
-          (texture) => {
-            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-            texture.repeat.set(2, 2);
-            texture.needsUpdate = true;
-            roughnessTexture = texture;
+          (t) => {
+            t.wrapS = t.wrapT = THREE.RepeatWrapping;
+            t.repeat.set(2, 2);
+            roughnessTexture = t;
             checkComplete();
           },
           undefined,
           handleError('Roughness')
         );
 
-        // Load Displacement texture
         textureLoader.load(
           '/textures/anthracite-disp.png',
-          (texture) => {
-            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-            texture.repeat.set(2, 2);
-            texture.needsUpdate = true;
-            displacementTexture = texture;
+          (t) => {
+            t.wrapS = t.wrapT = THREE.RepeatWrapping;
+            t.repeat.set(2, 2);
+            displacementTexture = t;
             checkComplete();
           },
           undefined,
@@ -322,35 +313,29 @@ const Floating3DObjects: React.FC = () => {
         ashtray.rotation.set(0.3, 1.2, -0.1);
         ashtray.scale.setScalar(getScale());
 
-        const baseMaterialParams: THREE.MeshStandardMaterialParameters = {
-          color: new THREE.Color('#8a8a8a'), // Lighter, clearer gray base color
+        const baseParams: THREE.MeshStandardMaterialParameters = {
+          color: new THREE.Color('#8a8a8a'),
           roughness: 0.7,
-          metalness: 0.0, // Concrete is not metallic
+          metalness: 0.0,
           transparent: true,
           opacity: 0
         };
-
-        // Apply PBR textures if loaded
-        if (diffuseTexture) {
-          baseMaterialParams.map = diffuseTexture;
-        }
+        if (diffuseTexture) baseParams.map = diffuseTexture;
         if (normalTexture) {
-          baseMaterialParams.normalMap = normalTexture;
-          baseMaterialParams.normalScale = new THREE.Vector2(0.1, 0.1);
+          baseParams.normalMap = normalTexture;
+          baseParams.normalScale = new THREE.Vector2(0.1, 0.1);
         }
-        if (roughnessTexture) {
-          baseMaterialParams.roughnessMap = roughnessTexture;
-        }
+        if (roughnessTexture) baseParams.roughnessMap = roughnessTexture;
 
-        const templateMaterial = new THREE.MeshStandardMaterial(baseMaterialParams);
+        const templateMat = new THREE.MeshStandardMaterial(baseParams);
 
-        ashtray.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            const mesh = child as THREE.Mesh;
-            mesh.material = templateMaterial.clone();
+        ashtray.traverse((c) => {
+          if ((c as THREE.Mesh).isMesh) {
+            const m = templateMat.clone();
+            (c as THREE.Mesh).material = m;
             if (!isMobile) {
-              mesh.castShadow = true;
-              mesh.receiveShadow = true;
+              (c as THREE.Mesh).castShadow = true;
+              (c as THREE.Mesh).receiveShadow = true;
             }
           }
         });
@@ -363,50 +348,43 @@ const Floating3DObjects: React.FC = () => {
 
         scene.add(ashtray);
 
-        // Create particles after ashtray is loaded
-        particles = createParticles(templateMaterial);
+        particles = createParticles(templateMat);
 
-        // Fade-in
-        const startTime = Date.now();
+        /* fade‑in */
+        const start = Date.now();
         const fadeDuration = isMobile ? 600 : 800;
         const fadeIn = () => {
           if (!ashtray) return;
-          const elapsed = Date.now() - startTime;
+          const elapsed = Date.now() - start;
           const p = Math.min(elapsed / fadeDuration, 1);
           const eased = 1 - Math.pow(1 - p, 3);
-          
-          // Fade in ashtray
-          ashtray.traverse((child) => {
-            if ((child as THREE.Mesh).isMesh) {
-              const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
-              mat.opacity = eased;
+
+          ashtray.traverse((c) => {
+            if ((c as THREE.Mesh).isMesh) {
+              ((c as THREE.Mesh).material as THREE.MeshStandardMaterial).opacity = eased;
             }
           });
-          
-          // Fade in particles with slight delay
           particles.forEach((particle, index) => {
-            const particleDelay = index * 200;
-            const particleElapsed = Math.max(0, elapsed - particleDelay);
-            const particleP = Math.min(particleElapsed / fadeDuration, 1);
-            const particleEased = 1 - Math.pow(1 - particleP, 3);
-            
-            const mat = (particle as THREE.Mesh).material as THREE.MeshStandardMaterial;
-            mat.opacity = particleEased;
+            const delay = index * 200;
+            const partElapsed = Math.max(0, elapsed - delay);
+            const partP = Math.min(partElapsed / fadeDuration, 1);
+            const partEased = 1 - Math.pow(1 - partP, 3);
+            ((particle as THREE.Mesh).material as THREE.MeshStandardMaterial).opacity = partEased;
           });
-          
+
           if (p < 1) requestAnimationFrame(fadeIn);
           else {
-            ashtray.traverse((child) => {
-              if ((child as THREE.Mesh).isMesh) {
-                const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
-                mat.transparent = false;
-                mat.opacity = 1;
+            ashtray.traverse((c) => {
+              if ((c as THREE.Mesh).isMesh) {
+                const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial;
+                m.transparent = false;
+                m.opacity = 1;
               }
             });
-            particles.forEach(particle => {
-              const mat = (particle as THREE.Mesh).material as THREE.MeshStandardMaterial;
-              mat.transparent = false;
-              mat.opacity = 1.0;
+            particles.forEach((p) => {
+              const m = (p as THREE.Mesh).material as THREE.MeshStandardMaterial;
+              m.transparent = false;
+              m.opacity = 1.0;
             });
           }
         };
@@ -418,10 +396,9 @@ const Floating3DObjects: React.FC = () => {
         setError('Model loading failed. Check /models/ashtray.glb.');
       }
     };
-
     loadModel();
 
-    // ---- FIXED INTERACTION ----
+    /* ------------- Interaction ------------- */
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
     let isTouch = false;
@@ -438,16 +415,11 @@ const Floating3DObjects: React.FC = () => {
         clientX = event.clientX;
         clientY = event.clientY;
         isTouch = false;
-      } else {
-        return;
-      }
+      } else return;
 
-      // FIXED: Ensure coordinates are always viewport-relative (0,0 = top-left of visible area)
-      // clientX/Y are already viewport-relative, so no scroll offset needed
       mouse.x = (clientX / window.innerWidth) * 2 - 1;
       mouse.y = -(clientY / window.innerHeight) * 2 + 1;
 
-      // Interaction detection (also viewport-relative)
       if (!isMobile || isTouch) {
         if (ashtray) {
           raycaster.setFromCamera(mouse, camera);
@@ -473,7 +445,7 @@ const Floating3DObjects: React.FC = () => {
     };
     window.addEventListener('touchend', onTouchEnd);
 
-    // ---- FIXED ANIMATE ----
+    /* ------------- Animation loop ------------- */
     let lastTime = 0;
     const targetFPS = isMobile ? 30 : 60;
     const interval = 1000 / targetFPS;
@@ -495,7 +467,6 @@ const Floating3DObjects: React.FC = () => {
           ashtray.rotation.y += spin.y * damping;
           ashtray.rotation.z += spin.z * damping;
 
-          // FIXED: Use normalized mouse position directly (already viewport-relative)
           const sensitivity = isMobile ? 10 : 15;
           const mousePos3D = new THREE.Vector3(mouse.x * sensitivity, mouse.y * sensitivity, 8);
           const dir = new THREE.Vector3().subVectors(mousePos3D, ashtray.position).normalize();
@@ -507,35 +478,27 @@ const Floating3DObjects: React.FC = () => {
         }
       }
 
-      // Animate particles
       particles.forEach((particle, index) => {
         const props = (particle as any).orbitProps;
         if (!props) return;
 
-        // Update orbital angle
         props.currentAngle += props.speed;
 
-        // Calculate asymmetrical orbital position
         const x = Math.cos(props.currentAngle) * props.distance;
         const z = Math.sin(props.currentAngle) * props.distance * props.eccentricity;
-        
-        // Add vertical bobbing motion
         const bobOffset = Math.sin(time * 0.001 * (1 + index * 0.3)) * props.bobAmplitude;
         const y = props.baseY + bobOffset;
 
-        // Smooth particle movement
         particle.position.x += (x - particle.position.x) * 0.02;
         particle.position.z += (z - particle.position.z) * 0.02;
         particle.position.y += (y - particle.position.y) * 0.03;
 
-        // Subtle rotation for organic feel
         if (particles.indexOf(particle) !== hoveredObject) {
           particle.rotation.x += 0.005 + index * 0.001;
           particle.rotation.y += 0.007 - index * 0.0015;
           particle.rotation.z += 0.003 + index * 0.002;
         }
 
-        // Scale effect on hover
         const targetScale = particle === hoveredObject ? 1.1 : 1.0;
         const currentScale = particle.scale.x;
         const newScale = currentScale + (targetScale - currentScale) * 0.1;
@@ -546,7 +509,7 @@ const Floating3DObjects: React.FC = () => {
     };
     animate(0);
 
-    // ---- Resize ----
+    /* ------------- Resize handler ------------- */
     const handleResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
@@ -573,7 +536,7 @@ const Floating3DObjects: React.FC = () => {
     };
     window.addEventListener('resize', throttledResize);
 
-    // ---- Cleanup ----
+    /* ------------- cleanup ------------- */
     return () => {
       window.removeEventListener('resize', throttledResize);
       window.removeEventListener('resize', checkMobile);
@@ -585,9 +548,9 @@ const Floating3DObjects: React.FC = () => {
       if (resizeTimeout) clearTimeout(resizeTimeout);
 
       if (ashtray) {
-        ashtray.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            const mesh = child as THREE.Mesh;
+        ashtray.traverse((c) => {
+          if ((c as THREE.Mesh).isMesh) {
+            const mesh = c as THREE.Mesh;
             mesh.geometry.dispose();
             if (Array.isArray(mesh.material)) mesh.material.forEach((m) => m.dispose());
             else mesh.material.dispose();
@@ -595,11 +558,10 @@ const Floating3DObjects: React.FC = () => {
         });
       }
 
-      // Cleanup particles
-      particles.forEach(particle => {
-        particle.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            const mesh = child as THREE.Mesh;
+      particles.forEach((particle) => {
+        particle.traverse((c) => {
+          if ((c as THREE.Mesh).isMesh) {
+            const mesh = c as THREE.Mesh;
             mesh.geometry.dispose();
             if (Array.isArray(mesh.material)) mesh.material.forEach((m) => m.dispose());
             else mesh.material.dispose();
@@ -615,17 +577,18 @@ const Floating3DObjects: React.FC = () => {
     };
   }, []);
 
-  return (
+  /* ==============   JSX (via portal)   ============== */
+  return createPortal(
     <>
       <div
         ref={mountRef}
-        style={{ 
+        style={{
           position: 'fixed',
           top: 0,
           left: 0,
           width: '100vw',
           height: '100vh',
-          pointerEvents: 'none', 
+          pointerEvents: 'none',
           zIndex: 1,
           opacity: isLoaded ? 1 : 0,
           transition: 'opacity 1s'
@@ -656,7 +619,8 @@ const Floating3DObjects: React.FC = () => {
           </div>
         </div>
       )}
-    </>
+    </>,
+    document.body
   );
 };
 
