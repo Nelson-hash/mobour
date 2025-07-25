@@ -428,8 +428,8 @@ const Floating3DObjects: React.FC = () => {
         particle.rotation.y += 0.007;
         particle.rotation.z += 0.003;
 
-        const targetScale = particle === hoveredObject ? 1.1 : 1.0;
-        particle.scale.setScalar(targetScale);
+        // Removed hover scale effect - keep particles at normal size
+        particle.scale.setScalar(1.0);
       });
 
       renderer.render(scene, camera);
