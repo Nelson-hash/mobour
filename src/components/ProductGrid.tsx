@@ -90,7 +90,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
     <section className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="text-center mb-12">
-        <h2 className="text-3xl sm:text-4xl font-light text-gray-900 mb-4">
+        <h2 className="text-5xl sm:text-6xl md:text-7xl font-light text-gray-900 mb-4">
           {title}
         </h2>
       </div>
