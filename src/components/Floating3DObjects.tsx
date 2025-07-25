@@ -103,14 +103,6 @@ const Floating3DObjects: React.FC = () => {
     renderer.shadowMap.enabled = !isMobile;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
-    
-    // Set fixed positioning to prevent scroll issues
-    renderer.domElement.style.position = 'fixed';
-    renderer.domElement.style.top = '0';
-    renderer.domElement.style.left = '0';
-    renderer.domElement.style.zIndex = '1';
-    renderer.domElement.style.pointerEvents = 'none';
-    
     mountRef.current.appendChild(renderer.domElement);
 
     const ambientLight = new THREE.AmbientLight(0xf0f0f0, isMobile ? 0.8 : 0.7);
@@ -175,17 +167,14 @@ const Floating3DObjects: React.FC = () => {
         // 1 medium particle
         { size: 1.4, distance: 18, speed: 0.008, offsetY: 1, eccentricity: 0.6 },
         // 1 large particle
-        { size: 2.2, distance: 22, speed: -0.006, offsetY: -1.5, eccentricity: 0.9 },
-        // 2 additional particles
-        { size: 1.0, distance: 14, speed: 0.011, offsetY: 3.5, eccentricity: 0.75 },
-        { size: 1.6, distance: 20, speed: -0.009, offsetY: -2.5, eccentricity: 0.65 }
+        { size: 2.2, distance: 22, speed: -0.006, offsetY: -1.5, eccentricity: 0.9 }
       ];
 
       return particleConfigs.map((config, index) => {
         const blobGeometry = createBlobGeometry(config.size, isMobile ? 4 : 6);
         const particleMaterial = baseMaterial.clone();
-        particleMaterial.transparent = false; // Remove transparency
-        particleMaterial.opacity = 1.0; // Full opacity
+        particleMaterial.transparent = true;
+        particleMaterial.opacity = isMobile ? 0.6 : 0.7;
         particleMaterial.roughness = 0.9;
         particleMaterial.metalness = 0.02;
         
@@ -201,7 +190,7 @@ const Floating3DObjects: React.FC = () => {
           particleNormal.repeat.set(1, 1);
           particleNormal.needsUpdate = true;
           particleMaterial.normalMap = particleNormal;
-          particleMaterial.normalScale = new THREE.Vector2(0.05, 0.05); // Extremely subtle normal for particles
+          particleMaterial.normalScale = new THREE.Vector2(0.15, 0.15); // Very subtle normal for particles
         }
         if (roughnessTexture) {
           const particleRoughness = roughnessTexture.clone();
@@ -285,9 +274,9 @@ const Floating3DObjects: React.FC = () => {
           handleError('Diffuse')
         );
 
-        // Load Normal texture - back to EXR
+        // Load Normal texture - now PNG
         textureLoader.load(
-          '/textures/anthracite-normal.exr',
+          '/textures/anthracite-normal.png',
           (texture) => {
             console.log('Normal texture loaded');
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
@@ -300,9 +289,9 @@ const Floating3DObjects: React.FC = () => {
           handleError('Normal')
         );
 
-        // Load Roughness texture - back to EXR
+        // Load Roughness texture - now PNG
         textureLoader.load(
-          '/textures/anthracite-roughness.exr',
+          '/textures/anthracite-roughness.png',
           (texture) => {
             console.log('Roughness texture loaded');
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
@@ -359,26 +348,26 @@ const Floating3DObjects: React.FC = () => {
         }
         if (normalTexture) {
           baseMaterialParams.normalMap = normalTexture;
-          // Much more subtle normal intensity to avoid cracks
-          baseMaterialParams.normalScale = new THREE.Vector2(0.1, 0.1);
-          console.log('Applied normal texture with very low intensity');
+          // Reduce normal intensity significantly
+          baseMaterialParams.normalScale = new THREE.Vector2(0.3, 0.3);
+          console.log('Applied normal texture');
         }
         if (roughnessTexture) {
           baseMaterialParams.roughnessMap = roughnessTexture;
           // Lower base roughness when using roughness map
-          baseMaterialParams.roughness = 0.7;
+          baseMaterialParams.roughness = 0.6;
           console.log('Applied roughness texture');
         }
         if (displacementTexture) {
-          // Disable displacement for now to avoid geometry issues
-          // baseMaterialParams.displacementMap = displacementTexture;
-          // baseMaterialParams.displacementScale = isMobile ? 0.01 : 0.02;
-          console.log('Displacement texture loaded but disabled to avoid artifacts');
+          baseMaterialParams.displacementMap = displacementTexture;
+          // Much more subtle displacement
+          baseMaterialParams.displacementScale = isMobile ? 0.01 : 0.02;
+          console.log('Applied displacement texture');
         }
 
         // Ensure proper material properties for concrete look
         baseMaterialParams.metalness = 0.0; // Concrete is not metallic
-        baseMaterialParams.color = new THREE.Color('#8a8a8a'); // Lighter, clearer gray base color
+        baseMaterialParams.color = new THREE.Color('#6b6b6b'); // Lighter gray base color
 
         const templateMaterial = new THREE.MeshStandardMaterial(baseMaterialParams);
 
@@ -429,8 +418,7 @@ const Floating3DObjects: React.FC = () => {
             const particleEased = 1 - Math.pow(1 - particleP, 3);
             
             const mat = (particle as THREE.Mesh).material as THREE.MeshStandardMaterial;
-            // Particles fade in to full opacity (no transparency)
-            mat.opacity = particleEased;
+            mat.opacity = particleEased * (isMobile ? 0.6 : 0.7);
           });
           
           if (p < 1) requestAnimationFrame(fadeIn);
@@ -444,8 +432,8 @@ const Floating3DObjects: React.FC = () => {
             });
             particles.forEach(particle => {
               const mat = (particle as THREE.Mesh).material as THREE.MeshStandardMaterial;
-              mat.transparent = false; // No transparency after fade-in
-              mat.opacity = 1.0; // Full opacity
+              mat.transparent = true;
+              mat.opacity = isMobile ? 0.6 : 0.7;
             });
           }
         };
