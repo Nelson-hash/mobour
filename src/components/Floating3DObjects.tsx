@@ -108,8 +108,12 @@ const Floating3DObjects: React.FC = () => {
     renderer.domElement.style.position = 'fixed';
     renderer.domElement.style.top = '0';
     renderer.domElement.style.left = '0';
+    renderer.domElement.style.width = '100vw';
+    renderer.domElement.style.height = '100vh';
     renderer.domElement.style.zIndex = '1';
     renderer.domElement.style.pointerEvents = 'none';
+    renderer.domElement.style.transform = 'translate3d(0, 0, 0)';
+    renderer.domElement.style.backfaceVisibility = 'hidden';
     
     mountRef.current.appendChild(renderer.domElement);
 
@@ -612,7 +616,17 @@ const Floating3DObjects: React.FC = () => {
       <div
         ref={mountRef}
         className={`fixed inset-0 transition-opacity duration-1000 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
-        style={{ pointerEvents: 'none', zIndex: 1 }}
+        style={{ 
+          pointerEvents: 'none', 
+          zIndex: 1,
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          transform: 'translate3d(0, 0, 0)',
+          backfaceVisibility: 'hidden'
+        }}
       />
       {error && (
         <div className="fixed inset-0 flex items-center justify-center z-10">
