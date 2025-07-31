@@ -14,34 +14,41 @@ const GLTFLoader = (() => {
         })
         .catch((importError) => {
           console.warn('Could not import GLTFLoader, creating geometric fallback:', importError);
-          const scene = this.createGeometricAshtray();
+          const scene = this.createGeometricLogo();
           onLoad({ scene });
         });
     }
 
-    createGeometricAshtray() {
+    createGeometricLogo() {
       const group = new THREE.Group();
-      const bodyGeometry = new THREE.CylinderGeometry(2, 2.5, 0.5, 32);
-      const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0xf8f8f8, shininess: 15, specular: 0x888888 });
-      const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-      body.position.y = 0.25;
-      group.add(body);
-
-      const innerGeometry = new THREE.CylinderGeometry(1.5, 1.8, 0.3, 32);
-      const innerMaterial = new THREE.MeshPhongMaterial({ color: 0xe8e8e8, shininess: 10 });
-      const inner = new THREE.Mesh(innerGeometry, innerMaterial);
-      inner.position.y = 0.35;
-      group.add(inner);
-
-      for (let i = 0; i < 3; i++) {
-        const notchGeometry = new THREE.BoxGeometry(0.3, 0.2, 0.1);
-        const notch = new THREE.Mesh(notchGeometry, bodyMaterial.clone());
-        const angle = (i / 3) * Math.PI * 2;
-        notch.position.x = Math.cos(angle) * 2.2;
-        notch.position.z = Math.sin(angle) * 2.2;
-        notch.position.y = 0.4;
-        group.add(notch);
-      }
+      
+      // Create a simple "M" shape as fallback
+      const letterGeometry = new THREE.BoxGeometry(0.2, 1.2, 0.1);
+      const letterMaterial = new THREE.MeshPhongMaterial({ color: 0x333333, shininess: 30 });
+      
+      // Left vertical bar
+      const leftBar = new THREE.Mesh(letterGeometry, letterMaterial);
+      leftBar.position.x = -0.4;
+      group.add(leftBar);
+      
+      // Right vertical bar
+      const rightBar = new THREE.Mesh(letterGeometry, letterMaterial);
+      rightBar.position.x = 0.4;
+      group.add(rightBar);
+      
+      // Middle diagonal bars
+      const diagonalGeometry = new THREE.BoxGeometry(0.1, 0.8, 0.1);
+      
+      const leftDiagonal = new THREE.Mesh(diagonalGeometry, letterMaterial);
+      leftDiagonal.position.set(-0.2, 0.2, 0);
+      leftDiagonal.rotation.z = Math.PI / 6;
+      group.add(leftDiagonal);
+      
+      const rightDiagonal = new THREE.Mesh(diagonalGeometry, letterMaterial);
+      rightDiagonal.position.set(0.2, 0.2, 0);
+      rightDiagonal.rotation.z = -Math.PI / 6;
+      group.add(rightDiagonal);
+      
       return group;
     }
   }
@@ -61,9 +68,9 @@ const Floating3DObjects: React.FC = () => {
     if (!mountRef.current) return;
 
     const isMobileScreen = () => window.innerWidth < 768;
-    const SCALE_FACTOR = 0.512;
-    const BASE_MOBILE = 15.0;
-    const BASE_DESKTOP = 24.0;
+    const SCALE_FACTOR = 1.2; // Increased scale for logo
+    const BASE_MOBILE = 8.0;
+    const BASE_DESKTOP = 12.0;
     const getScale = () => (isMobileScreen() ? BASE_MOBILE : BASE_DESKTOP) * SCALE_FACTOR;
 
     const checkMobile = () => setIsMobile(isMobileScreen());
@@ -142,7 +149,7 @@ const Floating3DObjects: React.FC = () => {
     scene.add(accentLight);
 
     const loader = new GLTFLoader();
-    let ashtray: THREE.Object3D | null = null;
+    let logo: THREE.Object3D | null = null;
     let hoveredObject: THREE.Object3D | null = null;
     let particles: THREE.Object3D[] = [];
 
@@ -234,7 +241,7 @@ const Floating3DObjects: React.FC = () => {
                 if ('colorSpace' in texture) (texture as any).colorSpace = THREE.SRGBColorSpace;
                 else if ('encoding' in texture) (texture as any).encoding = THREE.sRGBEncoding;
                 texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-                texture.repeat.set(2, 2);
+                texture.repeat.set(1, 1); // Adjusted for logo
                 texture.needsUpdate = true;
                 resolve(texture);
               },
@@ -243,40 +250,54 @@ const Floating3DObjects: React.FC = () => {
             );
           });
 
-        const [diffuseTexture, normalTexture, roughnessTexture, displacementTexture] = await Promise.all([
-          loadTexture('/textures/anthracite-diff.jpg'),
-          loadTexture('/textures/anthracite-normal.exr'),
-          loadTexture('/textures/anthracite-roughness.exr'),
-          loadTexture('/textures/anthracite-disp.png')
+        // Load optional textures (these might not exist for your logo)
+        const [diffuseTexture, normalTexture, roughnessTexture] = await Promise.all([
+          loadTexture('/textures/logo-diff.jpg').catch(() => null),
+          loadTexture('/textures/logo-normal.jpg').catch(() => null),
+          loadTexture('/textures/logo-roughness.jpg').catch(() => null)
         ]);
 
+        // Load the logo GLB file
         const gltf = await new Promise<any>((resolve, reject) => {
-          loader.load('/models/ashtray.glb', resolve, undefined, reject);
+          loader.load('/models/logo.glb', resolve, undefined, reject);
         });
 
-        ashtray = gltf.scene.clone();
-        ashtray.position.set(0, 0, 0);
-        ashtray.rotation.set(0.3, 1.2, -0.1);
-        ashtray.scale.setScalar(getScale());
+        logo = gltf.scene.clone();
+        
+        // Calculate bounding box for proper scaling and centering
+        const box = new THREE.Box3().setFromObject(logo);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        
+        // Center the logo
+        logo.position.sub(center);
+        
+        // Scale appropriately
+        logo.scale.setScalar(getScale());
+        
+        // Position slightly off-center for a more dynamic look
+        logo.position.set(0, 0, 0);
+        logo.rotation.set(0.2, 0.8, -0.1);
 
         const baseMaterialParams: THREE.MeshStandardMaterialParameters = {
-          color: new THREE.Color('#8a8a8a'),
-          roughness: 0.7,
-          metalness: 0.0,
+          color: new THREE.Color('#666666'), // Slightly darker for logo
+          roughness: 0.6,
+          metalness: 0.1,
           transparent: true,
           opacity: 0
         };
 
+        // Apply textures if they exist
         if (diffuseTexture) baseMaterialParams.map = diffuseTexture;
         if (normalTexture) {
           baseMaterialParams.normalMap = normalTexture;
-          baseMaterialParams.normalScale = new THREE.Vector2(0.1, 0.1);
+          baseMaterialParams.normalScale = new THREE.Vector2(0.2, 0.2);
         }
         if (roughnessTexture) baseMaterialParams.roughnessMap = roughnessTexture;
 
         const templateMaterial = new THREE.MeshStandardMaterial(baseMaterialParams);
 
-        ashtray.traverse((child) => {
+        logo.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
             mesh.material = templateMaterial.clone();
@@ -287,54 +308,55 @@ const Floating3DObjects: React.FC = () => {
           }
         });
 
-        (ashtray as any).spinSpeed = {
-          x: (Math.random() - 0.5) * (isMobile ? 0.015 : 0.02),
-          y: (Math.random() - 0.5) * (isMobile ? 0.02 : 0.03),
-          z: (Math.random() - 0.5) * (isMobile ? 0.018 : 0.025)
+        // Different rotation speeds for logo (more elegant)
+        (logo as any).spinSpeed = {
+          x: (Math.random() - 0.5) * (isMobile ? 0.008 : 0.012),
+          y: (Math.random() - 0.5) * (isMobile ? 0.012 : 0.018),
+          z: (Math.random() - 0.5) * (isMobile ? 0.006 : 0.010)
         };
 
-        scene.add(ashtray);
+        scene.add(logo);
         particles = createParticles(templateMaterial);
 
         // Fade-in animation
         const startTime = Date.now();
-        const fadeDuration = isMobile ? 600 : 800;
+        const fadeDuration = isMobile ? 800 : 1000;
         const fadeIn = () => {
-          if (!ashtray) return;
+          if (!logo) return;
           const elapsed = Date.now() - startTime;
           const p = Math.min(elapsed / fadeDuration, 1);
           const eased = 1 - Math.pow(1 - p, 3);
           
-          ashtray.traverse((child) => {
+          logo.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
               const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
-              mat.opacity = eased;
+              mat.opacity = eased * 0.9; // Slightly more transparent for elegance
             }
           });
           
           particles.forEach((particle, index) => {
-            const particleDelay = index * 200;
+            const particleDelay = index * 150;
             const particleElapsed = Math.max(0, elapsed - particleDelay);
             const particleP = Math.min(particleElapsed / fadeDuration, 1);
             const particleEased = 1 - Math.pow(1 - particleP, 3);
             
             const mat = (particle as THREE.Mesh).material as THREE.MeshStandardMaterial;
-            mat.opacity = particleEased;
+            mat.opacity = particleEased * 0.8;
           });
           
           if (p < 1) requestAnimationFrame(fadeIn);
           else {
-            ashtray.traverse((child) => {
+            logo.traverse((child) => {
               if ((child as THREE.Mesh).isMesh) {
                 const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
                 mat.transparent = false;
-                mat.opacity = 1;
+                mat.opacity = 0.9;
               }
             });
             particles.forEach(particle => {
               const mat = (particle as THREE.Mesh).material as THREE.MeshStandardMaterial;
               mat.transparent = false;
-              mat.opacity = 1.0;
+              mat.opacity = 0.8;
             });
           }
         };
@@ -342,8 +364,8 @@ const Floating3DObjects: React.FC = () => {
 
         setIsLoaded(true);
       } catch (err) {
-        console.error('Failed to load GLTF model:', err);
-        setError('Model loading failed.');
+        console.error('Failed to load logo model:', err);
+        setError('Logo loading failed.');
       }
     };
 
@@ -374,9 +396,9 @@ const Floating3DObjects: React.FC = () => {
       mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
-      if (ashtray) {
+      if (logo) {
         raycaster.setFromCamera(mouse, camera);
-        const allObjects = [ashtray, ...particles];
+        const allObjects = [logo, ...particles];
         const intersects = raycaster.intersectObjects(allObjects, true);
         hoveredObject = null;
         if (intersects.length > 0) {
@@ -396,18 +418,21 @@ const Floating3DObjects: React.FC = () => {
     const animate = (time: number) => {
       animationIdRef.current = requestAnimationFrame(animate);
 
-      if (ashtray) {
-        const spin = (ashtray as any).spinSpeed;
-        if (ashtray !== hoveredObject) {
-          ashtray.rotation.x += spin.x;
-          ashtray.rotation.y += spin.y;
-          ashtray.rotation.z += spin.z;
+      if (logo) {
+        const spin = (logo as any).spinSpeed;
+        if (logo !== hoveredObject) {
+          logo.rotation.x += spin.x;
+          logo.rotation.y += spin.y;
+          logo.rotation.z += spin.z;
         } else {
           const damping = isMobile ? 0.2 : 0.3;
-          ashtray.rotation.x += spin.x * damping + mouse.y * 0.02;
-          ashtray.rotation.y += spin.y * damping + mouse.x * 0.02;
-          ashtray.rotation.z += spin.z * damping;
+          logo.rotation.x += spin.x * damping + mouse.y * 0.015;
+          logo.rotation.y += spin.y * damping + mouse.x * 0.015;
+          logo.rotation.z += spin.z * damping;
         }
+
+        // Add gentle floating motion to the logo
+        logo.position.y = Math.sin(time * 0.0008) * 0.3;
       }
 
       // Animate particles
@@ -424,11 +449,10 @@ const Floating3DObjects: React.FC = () => {
 
         particle.position.set(x, y, z);
 
-        particle.rotation.x += 0.005;
-        particle.rotation.y += 0.007;
-        particle.rotation.z += 0.003;
+        particle.rotation.x += 0.003;
+        particle.rotation.y += 0.004;
+        particle.rotation.z += 0.002;
 
-        // Removed hover scale effect - keep particles at normal size
         particle.scale.setScalar(1.0);
       });
 
@@ -448,8 +472,8 @@ const Floating3DObjects: React.FC = () => {
       renderer.setSize(rect.width, rect.height);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-      if (ashtray) {
-        ashtray.scale.setScalar(getScale());
+      if (logo) {
+        logo.scale.setScalar(getScale());
       }
 
       setIsMobile(isMobileScreen());
@@ -472,8 +496,8 @@ const Floating3DObjects: React.FC = () => {
       if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
       if (resizeTimeout) clearTimeout(resizeTimeout);
 
-      if (ashtray) {
-        ashtray.traverse((child) => {
+      if (logo) {
+        logo.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
             mesh.geometry.dispose();
