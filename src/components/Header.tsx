@@ -1,6 +1,9 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, Suspense } from 'react';
 import { Menu, X } from 'lucide-react';
 import { useCart } from '../hooks/useCart';
+
+// Lazy load the 3D logo component
+const Logo3D = React.lazy(() => import('./Logo3D'));
 
 interface HeaderProps {
   onPageChange: (page: string) => void;
@@ -45,16 +48,23 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
             MOBOUR
           </div>
 
-          {/* Centered Logo - Made bigger and higher */}
+          {/* Centered 3D Logo - Made bigger and higher */}
           <div className="absolute left-1/2 transform -translate-x-1/2 -translate-y-4">
-            <img
-              src="/logo.svg"
-              alt="MOBOUR"
-              className="h-16 sm:h-20 w-auto cursor-pointer hover:opacity-75 transition-opacity bg-transparent"
-              style={{ mixBlendMode: 'multiply' }}
-              onClick={handleLogoClick}
-              loading="eager"
-            />
+            <Suspense 
+              fallback={
+                <div 
+                  className="flex items-center justify-center bg-gray-100 rounded-full animate-pulse"
+                  style={{ width: '80px', height: '80px' }}
+                >
+                  <div className="text-gray-400 text-xs">MOBOUR</div>
+                </div>
+              }
+            >
+              <Logo3D 
+                onClick={handleLogoClick}
+                size={80} // Size for desktop
+              />
+            </Suspense>
           </div>
 
           {/* Burger menu with proper dropdown positioning */}
@@ -99,6 +109,15 @@ const Header: React.FC<HeaderProps> = ({ onPageChange, currentPage }) => {
           </div>
         </div>
       </div>
+
+      {/* Mobile responsive adjustments */}
+      <style jsx>{`
+        @media (max-width: 640px) {
+          .absolute.left-1\/2 {
+            transform: translateX(-50%) translateY(-2px);
+          }
+        }
+      `}</style>
     </header>
   );
 };
