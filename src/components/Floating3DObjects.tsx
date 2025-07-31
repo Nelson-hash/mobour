@@ -68,7 +68,7 @@ const Floating3DObjects: React.FC = () => {
     if (!mountRef.current) return;
 
     const isMobileScreen = () => window.innerWidth < 768;
-    const SCALE_FACTOR = 2.048; // 4x bigger than current (0.512 * 4)
+    const SCALE_FACTOR = 5; // 5x bigger than original (0.512 * 5)
     const BASE_MOBILE = 15.0;
     const BASE_DESKTOP = 24.0;
     const getScale = () => (isMobileScreen() ? BASE_MOBILE : BASE_DESKTOP) * SCALE_FACTOR;
@@ -250,11 +250,12 @@ const Floating3DObjects: React.FC = () => {
             );
           });
 
-        // Load optional textures (these might not exist for your logo)
-        const [diffuseTexture, normalTexture, roughnessTexture] = await Promise.all([
-          loadTexture('/textures/logo-diff.jpg').catch(() => null),
-          loadTexture('/textures/logo-normal.jpg').catch(() => null),
-          loadTexture('/textures/logo-roughness.jpg').catch(() => null)
+        // Load the same textures as the original ashtray
+        const [diffuseTexture, normalTexture, roughnessTexture, displacementTexture] = await Promise.all([
+          loadTexture('/textures/anthracite-diff.jpg'),
+          loadTexture('/textures/anthracite-normal.exr'),
+          loadTexture('/textures/anthracite-roughness.exr'),
+          loadTexture('/textures/anthracite-disp.png')
         ]);
 
         // Load the logo GLB file
@@ -280,18 +281,17 @@ const Floating3DObjects: React.FC = () => {
         logo.rotation.set(0.2, 0.8, -0.1);
 
         const baseMaterialParams: THREE.MeshStandardMaterialParameters = {
-          color: new THREE.Color('#666666'), // Slightly darker for logo
-          roughness: 0.6,
-          metalness: 0.1,
+          color: new THREE.Color('#8a8a8a'), // Same as original ashtray
+          roughness: 0.7,
+          metalness: 0.0,
           transparent: true,
           opacity: 0
         };
 
-        // Apply textures if they exist
         if (diffuseTexture) baseMaterialParams.map = diffuseTexture;
         if (normalTexture) {
           baseMaterialParams.normalMap = normalTexture;
-          baseMaterialParams.normalScale = new THREE.Vector2(0.2, 0.2);
+          baseMaterialParams.normalScale = new THREE.Vector2(0.1, 0.1);
         }
         if (roughnessTexture) baseMaterialParams.roughnessMap = roughnessTexture;
 
