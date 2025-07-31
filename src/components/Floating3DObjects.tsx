@@ -68,9 +68,9 @@ const Floating3DObjects: React.FC = () => {
     if (!mountRef.current) return;
 
     const isMobileScreen = () => window.innerWidth < 768;
-    const SCALE_FACTOR = 1.2; // Increased scale for logo
-    const BASE_MOBILE = 8.0;
-    const BASE_DESKTOP = 12.0;
+    const SCALE_FACTOR = 0.512; // Same scale as original ashtray
+    const BASE_MOBILE = 15.0;
+    const BASE_DESKTOP = 24.0;
     const getScale = () => (isMobileScreen() ? BASE_MOBILE : BASE_DESKTOP) * SCALE_FACTOR;
 
     const checkMobile = () => setIsMobile(isMobileScreen());
