@@ -68,7 +68,7 @@ const Floating3DObjects: React.FC = () => {
     if (!mountRef.current) return;
 
     const isMobileScreen = () => window.innerWidth < 768;
-    const SCALE_FACTOR = 10; // 5x bigger than original (0.512 * 5)
+    const SCALE_FACTOR = 7; // 5x bigger than original (0.512 * 5)
     const BASE_MOBILE = 15.0;
     const BASE_DESKTOP = 24.0;
     const getScale = () => (isMobileScreen() ? BASE_MOBILE : BASE_DESKTOP) * SCALE_FACTOR;
